@@ -546,7 +546,8 @@ export const TOOLS: ToolDef[] = [
     blurb: "Point your camera at a code, or upload a picture of one.",
     keywords: ["scan", "decode", "camera"],
     accepts: ["image"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/QrReader"),
   },
   {
     slug: "barcode-generator",
@@ -556,7 +557,8 @@ export const TOOLS: ToolDef[] = [
     blurb: "Make EAN, UPC and Code 128 barcodes.",
     keywords: ["ean", "upc", "code128", "product"],
     accepts: [],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/BarcodeGenerator"),
   },
 
   // -------------------------------------------------------------------- Media
@@ -686,7 +688,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["archive", "compress", "bundle"],
     accepts: ["pdf", "image", "video", "audio", "document", "spreadsheet", "text", "archive"],
     multiple: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/ZipFiles"),
   },
   {
     slug: "unzip-files",
@@ -695,7 +698,8 @@ export const TOOLS: ToolDef[] = [
     blurb: "Look inside a .zip and pull out what you need.",
     keywords: ["extract", "unarchive", "open"],
     accepts: ["archive"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/UnzipFiles"),
   },
   {
     slug: "convert-spreadsheet",
@@ -705,7 +709,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["xlsx", "csv", "json", "excel", "data"],
     accepts: ["spreadsheet"],
     multiple: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/ConvertSpreadsheet"),
   },
   {
     slug: "word-count",
