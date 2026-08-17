@@ -714,7 +714,8 @@ export const TOOLS: ToolDef[] = [
     blurb: "Words, characters and reading time for any text.",
     keywords: ["character count", "reading time", "essay", "limit"],
     accepts: ["text"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/WordCount"),
   },
   {
     slug: "case-converter",
@@ -723,7 +724,8 @@ export const TOOLS: ToolDef[] = [
     blurb: "UPPERCASE, lowercase, Title Case and back again.",
     keywords: ["uppercase", "lowercase", "title case", "sentence case"],
     accepts: ["text"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/CaseConverter"),
   },
   {
     slug: "base64",
@@ -732,7 +734,8 @@ export const TOOLS: ToolDef[] = [
     blurb: "Turn a file or text into Base64 and back again.",
     keywords: ["encode", "decode", "data uri"],
     accepts: [],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/Base64Tool"),
   },
   {
     slug: "hash",
@@ -742,7 +745,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["sha256", "md5", "checksum", "verify", "integrity"],
     accepts: ["pdf", "image", "video", "audio", "document", "spreadsheet", "text", "archive"],
     multiple: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/HashTool"),
   },
 ];
 
