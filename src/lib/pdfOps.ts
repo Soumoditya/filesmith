@@ -252,6 +252,59 @@ export async function imagesToPdf(
   return finish(out);
 }
 
+/**
+ * Rebuilds a document from one image per page, each page kept at its exact
+ * original size in points.
+ *
+ * This is how "compress hard" works: pages are rendered to JPEG and reassembled.
+ * It trades away selectable text for a large size reduction, which is the right
+ * trade when a portal refuses anything over 2MB — but only when the user has
+ * been told, which is why it's a separate function from the lossless path.
+ */
+export async function rebuildFromPageImages(
+  images: Array<{ data: ArrayBuffer; format: "png" | "jpg" }>,
+  sizes: Array<{ width: number; height: number }>,
+  onProgress?: ProgressFn,
+): Promise<Uint8Array> {
+  const out = await PDFDocument.create();
+
+  for (let i = 0; i < images.length; i++) {
+    const { data, format } = images[i];
+    const embedded =
+      format === "jpg" ? await out.embedJpg(data) : await out.embedPng(data);
+
+    const size = sizes[i] ?? { width: embedded.width, height: embedded.height };
+    const page = out.addPage([size.width, size.height]);
+    page.drawImage(embedded, {
+      x: 0,
+      y: 0,
+      width: size.width,
+      height: size.height,
+    });
+
+    onProgress?.(i + 1, images.length);
+  }
+
+  return finish(out);
+}
+
+/**
+ * Re-saves without re-encoding anything: drops metadata and lets pdf-lib
+ * write compressed object streams. Modest savings, but completely lossless —
+ * text stays text and stays searchable.
+ */
+export async function shrinkLossless(source: PdfSource): Promise<Uint8Array> {
+  const doc = await load(source);
+
+  doc.setTitle("");
+  doc.setSubject("");
+  doc.setKeywords([]);
+  doc.setAuthor("");
+
+  const bytes = await doc.save({ useObjectStreams: true });
+  return bytes;
+}
+
 export async function addPageNumbers(
   source: PdfSource,
   opts: PageNumberOptions,

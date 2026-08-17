@@ -8,6 +8,8 @@ import {
   organise,
   pageCount,
   protect,
+  rebuildFromPageImages,
+  shrinkLossless,
   splitPages,
   unlock,
   watermark,
@@ -280,6 +282,86 @@ describe("watermark", () => {
     const count = (d: PDFDocument) => (drawnText(d, 0).match(/DRAFT/g) || []).length;
     expect(count(one)).toBe(1);
     expect(count(many)).toBeGreaterThan(4);
+  });
+});
+
+/** A 2x2 PNG, base64. Enough for pdf-lib to embed something real. */
+const TINY_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEklEQVR4nGP8z4AATAxIHAgHAB1lAQoyLYcQAAAAAElFTkSuQmCC",
+  "base64",
+);
+
+describe("rebuildFromPageImages", () => {
+  it("keeps each page at its original size, not the image's pixel size", async () => {
+    // This is the whole point: a 2x2 pixel image rendered onto an A4 page
+    // must produce an A4 page, not a 2x2 point one.
+    const out = await rebuildFromPageImages(
+      [
+        { data: TINY_PNG.buffer.slice(TINY_PNG.byteOffset, TINY_PNG.byteOffset + TINY_PNG.byteLength) as ArrayBuffer, format: "png" },
+        { data: TINY_PNG.buffer.slice(TINY_PNG.byteOffset, TINY_PNG.byteOffset + TINY_PNG.byteLength) as ArrayBuffer, format: "png" },
+      ],
+      [
+        { width: 595, height: 842 },
+        { width: 400, height: 300 },
+      ],
+    );
+
+    const doc = await PDFDocument.load(out);
+    expect(doc.getPageCount()).toBe(2);
+    expect(doc.getPage(0).getSize()).toEqual({ width: 595, height: 842 });
+    expect(doc.getPage(1).getSize()).toEqual({ width: 400, height: 300 });
+  });
+
+  it("reports progress per page", async () => {
+    const seen: number[] = [];
+    const data = TINY_PNG.buffer.slice(
+      TINY_PNG.byteOffset,
+      TINY_PNG.byteOffset + TINY_PNG.byteLength,
+    ) as ArrayBuffer;
+    await rebuildFromPageImages(
+      [
+        { data, format: "png" },
+        { data, format: "png" },
+      ],
+      [
+        { width: 100, height: 100 },
+        { width: 100, height: 100 },
+      ],
+      (done) => seen.push(done),
+    );
+    expect(seen).toEqual([1, 2]);
+  });
+
+  it("falls back to the image size when no page size is given", async () => {
+    const data = TINY_PNG.buffer.slice(
+      TINY_PNG.byteOffset,
+      TINY_PNG.byteOffset + TINY_PNG.byteLength,
+    ) as ArrayBuffer;
+    const out = await rebuildFromPageImages([{ data, format: "png" }], []);
+    expect((await PDFDocument.load(out)).getPage(0).getSize()).toEqual({
+      width: 2,
+      height: 2,
+    });
+  });
+});
+
+describe("shrinkLossless", () => {
+  it("keeps every page and its drawn content", async () => {
+    const out = await shrinkLossless(three);
+    expect(await pageCount(out)).toBe(3);
+    expect(await labelsOf(out)).toEqual(["A1", "A2", "A3"]);
+  });
+
+  it("strips the metadata it promises to strip", async () => {
+    const doc = await PDFDocument.load(three);
+    doc.setAuthor("Someone Private");
+    doc.setTitle("Internal draft");
+    const withMetadata = await doc.save();
+
+    const out = await shrinkLossless(withMetadata);
+    const reopened = await PDFDocument.load(out);
+    expect(reopened.getAuthor() || "").toBe("");
+    expect(reopened.getTitle() || "").toBe("");
   });
 });
 

@@ -159,7 +159,8 @@ export const TOOLS: ToolDef[] = [
     extensions: ["pdf"],
     multiple: true,
     popular: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/CompressPdf"),
   },
   {
     slug: "compress-to-size",
@@ -171,7 +172,8 @@ export const TOOLS: ToolDef[] = [
     accepts: ["pdf", "image"],
     multiple: true,
     popular: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/FitUnderSize"),
   },
   {
     slug: "pdf-to-image",
@@ -183,7 +185,8 @@ export const TOOLS: ToolDef[] = [
     accepts: ["pdf"],
     extensions: ["pdf"],
     popular: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/PdfToImages"),
   },
   {
     slug: "image-to-pdf",
@@ -267,7 +270,8 @@ export const TOOLS: ToolDef[] = [
     accepts: ["pdf"],
     extensions: ["pdf"],
     multiple: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/ProtectPdf"),
   },
   {
     slug: "unlock-pdf",
@@ -278,7 +282,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["decrypt", "unlock"],
     accepts: ["pdf"],
     extensions: ["pdf"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/UnlockPdf"),
   },
   {
     slug: "redact-pdf",
@@ -334,7 +339,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["extract text", "markdown", "copy"],
     accepts: ["pdf"],
     extensions: ["pdf"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/PdfToText"),
   },
 
   // ------------------------------------------------------------------- Images

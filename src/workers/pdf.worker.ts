@@ -43,6 +43,14 @@ const api = {
     onProgress: ops.ProgressFn,
   ) => send(await ops.imagesToPdf(files, opts, onProgress)),
 
+  rebuildFromPageImages: async (
+    images: Array<{ data: ArrayBuffer; format: "png" | "jpg" }>,
+    sizes: Array<{ width: number; height: number }>,
+    onProgress: ops.ProgressFn,
+  ) => send(await ops.rebuildFromPageImages(images, sizes, onProgress)),
+
+  shrinkLossless: async (file: File) => send(await ops.shrinkLossless(file)),
+
   addPageNumbers: async (file: File, opts: ops.PageNumberOptions) =>
     send(await ops.addPageNumbers(file, opts)),
 
