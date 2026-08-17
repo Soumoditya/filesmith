@@ -360,7 +360,8 @@ export const TOOLS: ToolDef[] = [
     accepts: ["image"],
     multiple: true,
     popular: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/ConvertImage"),
   },
   {
     slug: "compress-image",
@@ -372,7 +373,8 @@ export const TOOLS: ToolDef[] = [
     accepts: ["image"],
     multiple: true,
     popular: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/CompressImage"),
   },
   {
     slug: "resize-image",
@@ -383,7 +385,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["scale", "dimensions", "width", "height"],
     accepts: ["image"],
     multiple: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/ResizeImage"),
   },
   {
     slug: "crop-image",
@@ -404,7 +407,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["turn", "mirror", "straighten", "orientation"],
     accepts: ["image"],
     multiple: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/RotateImage"),
   },
   {
     slug: "watermark-image",
@@ -415,7 +419,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["logo", "brand", "stamp", "copyright"],
     accepts: ["image"],
     multiple: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/WatermarkImage"),
   },
   {
     slug: "passport-photo",
@@ -426,7 +431,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["id photo", "visa", "35x45", "2x2", "print sheet"],
     accepts: ["image"],
     popular: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/PassportPhoto"),
   },
   {
     slug: "favicon-generator",
@@ -436,7 +442,8 @@ export const TOOLS: ToolDef[] = [
     blurb: "One picture in, a complete set of website icons out.",
     keywords: ["icon", "app icon", "manifest", "apple touch"],
     accepts: ["image"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/FaviconGenerator"),
   },
   {
     slug: "palette-extractor",
@@ -446,7 +453,8 @@ export const TOOLS: ToolDef[] = [
     blurb: "Pull the main colours out of a picture as hex codes.",
     keywords: ["colour", "color", "palette", "hex", "swatch"],
     accepts: ["image"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/PaletteExtractor"),
   },
 
   // ------------------------------------------------------------------- Create
