@@ -8,6 +8,10 @@
    them into Tailwind utilities (bg-canvas, text-muted, ...).
    --------------------------------------------------------------- */
 
+/* Touch devices get larger hit areas without inflating the mouse UI.
+   Apple and Google both put the comfortable minimum at ~44px. */
+@custom-variant touch (@media (pointer: coarse));
+
 @theme {
   --color-canvas: var(--c-canvas);
   --color-surface: var(--c-surface);

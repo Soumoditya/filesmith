@@ -6,7 +6,15 @@ import { ToolCard } from "../components/ToolCard";
 import { Button, Card } from "../components/ui";
 import { extensionOf, formatBytes, kindOf } from "../lib/files";
 import { stageFiles } from "../lib/handoff";
-import { HUBS, toolsForKind, toolsInHub, type FileKind, type ToolDef } from "../lib/registry";
+import {
+  HUBS,
+  popularTools,
+  sectionsInHub,
+  toolsForKind,
+  toolsInHub,
+  type FileKind,
+  type ToolDef,
+} from "../lib/registry";
 
 interface Dropped {
   file: File;
@@ -137,6 +145,18 @@ export default function Home() {
         )}
       </section>
 
+      {/* ------------------------------------------------------- Most used */}
+      <section className="mx-auto mt-16 max-w-6xl px-4 sm:px-6">
+        <h2 className="text-xs font-semibold tracking-wide text-faint uppercase">
+          Most used
+        </h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {popularTools(8).map((tool) => (
+            <ToolCard key={tool.slug} tool={tool} />
+          ))}
+        </div>
+      </section>
+
       {/* --------------------------------------------------------- Promises */}
       <section className="mx-auto mt-16 max-w-6xl px-4 sm:px-6">
         <div className="grid gap-6 sm:grid-cols-3">
@@ -160,7 +180,7 @@ export default function Home() {
               <div className="flex items-end justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-semibold tracking-tight text-ink">
-                    <Link to={`/${hub.id}`} className="transition-colors hover:text-accent">
+                    <Link to={`/${hub.id}`} className="inline-flex items-center transition-colors hover:text-accent touch:min-h-11">
                       {hub.name}
                     </Link>
                   </h2>
@@ -168,9 +188,20 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {tools.map((tool) => (
-                  <ToolCard key={tool.slug} tool={tool} />
+              <div className="mt-5 space-y-6">
+                {sectionsInHub(hub.id).map((section) => (
+                  <div key={section.name || "all"}>
+                    {section.name && (
+                      <h3 className="mb-3 text-xs font-medium text-faint">
+                        {section.name}
+                      </h3>
+                    )}
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {section.tools.map((tool) => (
+                        <ToolCard key={tool.slug} tool={tool} />
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </section>

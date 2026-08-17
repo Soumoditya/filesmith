@@ -379,7 +379,7 @@ export default function QrGenerator() {
                       type="color"
                       value={dark}
                       onChange={(e) => setDark(e.target.value)}
-                      className="h-10 w-12 cursor-pointer rounded-lg border border-line-strong bg-surface p-1"
+                      className="h-10 w-12 touch:h-11 touch:w-14 cursor-pointer rounded-lg border border-line-strong bg-surface p-1"
                     />
                     <TextInput
                       value={dark}
@@ -399,7 +399,7 @@ export default function QrGenerator() {
                       value={light}
                       disabled={transparent}
                       onChange={(e) => setLight(e.target.value)}
-                      className="h-10 w-12 cursor-pointer rounded-lg border border-line-strong bg-surface p-1 disabled:opacity-40"
+                      className="h-10 w-12 touch:h-11 touch:w-14 cursor-pointer rounded-lg border border-line-strong bg-surface p-1 disabled:opacity-40"
                     />
                     <TextInput
                       value={transparent ? "transparent" : light}
@@ -442,7 +442,7 @@ export default function QrGenerator() {
             <button
               type="button"
               onClick={() => setBulkOpen((v) => !v)}
-              className="flex w-full items-center justify-between gap-3 text-left"
+              className="flex w-full items-center justify-between gap-3 py-1 text-left touch:min-h-11"
             >
               <span>
                 <span className="block text-sm font-semibold text-ink">

@@ -30,10 +30,44 @@ function ThemeToggle() {
       onClick={cycle}
       title={`${label} — click to change`}
       aria-label={`${label}. Click to change.`}
-      className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-sunken hover:text-ink"
+      className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-sunken hover:text-ink touch:size-11"
     >
       <Icon className="size-[1.125rem]" />
     </button>
+  );
+}
+
+/**
+ * Category navigation for phones. The header's inline nav is hidden below
+ * `lg`, which previously left touch users with no way to browse categories
+ * at all — only search or the footer.
+ */
+function MobileHubBar() {
+  return (
+    <nav
+      aria-label="Tool categories"
+      className="scroll-x border-b border-line bg-canvas/85 backdrop-blur-md lg:hidden"
+    >
+      <ul className="flex w-max gap-1.5 px-4 py-2 sm:px-6">
+        {HUBS.map((hub) => (
+          <li key={hub.id}>
+            <NavLink
+              to={`/${hub.id}`}
+              className={({ isActive }) =>
+                clsx(
+                  "flex h-9 items-center rounded-full border px-3.5 text-sm font-medium whitespace-nowrap transition-colors touch:h-11",
+                  isActive
+                    ? "border-accent bg-accent-wash text-accent"
+                    : "border-line text-muted hover:text-ink",
+                )
+              }
+            >
+              {hub.name}
+            </NavLink>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 
@@ -41,7 +75,7 @@ function Header({ onOpenSearch }: { onOpenSearch: () => void }) {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
-        <Link to="/" className="shrink-0 rounded" aria-label="Filesmith home">
+        <Link to="/" className="flex shrink-0 items-center rounded touch:h-11" aria-label="Filesmith home">
           <Logo />
         </Link>
 
@@ -66,7 +100,7 @@ function Header({ onOpenSearch }: { onOpenSearch: () => void }) {
           <button
             type="button"
             onClick={onOpenSearch}
-            className="flex h-9 items-center gap-2 rounded-lg border border-line px-2.5 text-sm text-muted transition-colors hover:border-line-strong hover:text-ink sm:pr-2"
+            className="flex h-9 touch:h-11 items-center gap-2 rounded-lg border border-line px-2.5 touch:px-3.5 text-sm text-muted transition-colors hover:border-line-strong hover:text-ink sm:pr-2"
           >
             <Search className="size-4" aria-hidden />
             <span className="hidden sm:inline">Search tools</span>
@@ -82,12 +116,14 @@ function Header({ onOpenSearch }: { onOpenSearch: () => void }) {
             target="_blank"
             rel="noreferrer noopener"
             aria-label="Source code on GitHub"
-            className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-sunken hover:text-ink"
+            className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-sunken hover:text-ink touch:size-11"
           >
             <GithubMark className="size-[1.0625rem]" />
           </a>
         </div>
       </div>
+
+      <MobileHubBar />
     </header>
   );
 }
@@ -113,7 +149,7 @@ function Footer() {
                 <li key={hub.id}>
                   <Link
                     to={`/${hub.id}`}
-                    className="text-sm text-muted transition-colors hover:text-ink"
+                    className="inline-flex items-center text-sm text-muted transition-colors hover:text-ink touch:min-h-11"
                   >
                     {hub.name}
                   </Link>
@@ -130,7 +166,7 @@ function Footer() {
               <li>
                 <Link
                   to="/privacy"
-                  className="text-sm text-muted transition-colors hover:text-ink"
+                  className="inline-flex items-center text-sm text-muted transition-colors hover:text-ink touch:min-h-11"
                 >
                   Privacy
                 </Link>
@@ -140,7 +176,7 @@ function Footer() {
                   href={REPO_URL}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-sm text-muted transition-colors hover:text-ink"
+                  className="inline-flex items-center text-sm text-muted transition-colors hover:text-ink touch:min-h-11"
                 >
                   Source code
                 </a>

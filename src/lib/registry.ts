@@ -9,13 +9,16 @@ import type { ComponentType } from "react";
  * homepage needs all of it to match dropped files). The tool UI itself is
  * behind `load`, so each tool and its heavy libraries are a separate chunk
  * fetched only when someone opens it.
+ *
+ * Hubs are ordered by real-world demand, and each is split into sections so
+ * an eighteen-item category stops being a wall of links.
  */
 
 export type HubId =
   | "documents"
   | "images"
-  | "media"
   | "create"
+  | "media"
   | "clean"
   | "utilities";
 
@@ -34,6 +37,8 @@ export interface HubDef {
   id: HubId;
   name: string;
   blurb: string;
+  /** Section headings, in display order. Empty means a flat list. */
+  sections: string[];
 }
 
 export const HUBS: HubDef[] = [
@@ -41,31 +46,37 @@ export const HUBS: HubDef[] = [
     id: "documents",
     name: "Documents",
     blurb: "Merge, split, sign, convert and clean up PDFs and Word files.",
+    sections: ["Organise", "Convert", "Edit", "Secure", "Improve"],
   },
   {
     id: "images",
     name: "Images",
     blurb: "Convert, shrink, resize and touch up pictures.",
+    sections: ["Convert & compress", "Resize & crop", "Edit", "Generate"],
+  },
+  {
+    id: "create",
+    name: "Create",
+    blurb: "Build a resume, an invoice, a letter or a QR code from scratch.",
+    sections: ["Documents", "Codes"],
   },
   {
     id: "media",
     name: "Media",
     blurb: "Convert, trim and compress video and audio.",
-  },
-  {
-    id: "create",
-    name: "Create",
-    blurb: "Make a polished PDF, a QR code, or a document from scratch.",
+    sections: ["Convert", "Edit", "Inspect"],
   },
   {
     id: "clean",
     name: "Clean",
     blurb: "Remove backgrounds and unwanted objects, using AI on your device.",
+    sections: [],
   },
   {
     id: "utilities",
     name: "Utilities",
-    blurb: "Zip, spreadsheets, encoding and checksums.",
+    blurb: "Zip, spreadsheets, text counts, encoding and checksums.",
+    sections: [],
   },
 ];
 
@@ -73,6 +84,8 @@ export interface ToolDef {
   slug: string;
   name: string;
   hub: HubId;
+  /** Must match one of the hub's sections, when it has any. */
+  section?: string;
   /** One plain-English line. No jargon. */
   blurb: string;
   /** Extra search terms people might actually type. */
@@ -86,6 +99,8 @@ export interface ToolDef {
   extensions?: string[];
   /** Whether the tool operates on a batch. */
   multiple?: boolean;
+  /** Surfaces in the homepage "Most used" row. */
+  popular?: boolean;
   /** `soon` tools are listed but not linked — honest, not vapourware. */
   status: "ready" | "soon";
   load?: () => Promise<{ default: ComponentType }>;
@@ -97,11 +112,13 @@ export const TOOLS: ToolDef[] = [
     slug: "merge-pdf",
     name: "Merge PDF",
     hub: "documents",
+    section: "Organise",
     blurb: "Join several PDFs into one file, in any order you like.",
     keywords: ["combine", "join", "append", "concat"],
     accepts: ["pdf"],
     extensions: ["pdf"],
     multiple: true,
+    popular: true,
     status: "ready",
     load: () => import("../tools/MergePdf"),
   },
@@ -109,10 +126,12 @@ export const TOOLS: ToolDef[] = [
     slug: "split-pdf",
     name: "Split PDF",
     hub: "documents",
+    section: "Organise",
     blurb: "Pull out single pages or break one PDF into several.",
     keywords: ["extract pages", "separate", "divide"],
     accepts: ["pdf"],
     extensions: ["pdf"],
+    popular: true,
     status: "ready",
     load: () => import("../tools/SplitPdf"),
   },
@@ -120,10 +139,12 @@ export const TOOLS: ToolDef[] = [
     slug: "organise-pdf",
     name: "Organise pages",
     hub: "documents",
+    section: "Organise",
     blurb: "Reorder, rotate and delete pages on a visual page grid.",
     keywords: ["reorder", "rotate", "delete pages", "rearrange"],
     accepts: ["pdf"],
     extensions: ["pdf"],
+    popular: true,
     status: "ready",
     load: () => import("../tools/OrganisePdf"),
   },
@@ -131,31 +152,49 @@ export const TOOLS: ToolDef[] = [
     slug: "compress-pdf",
     name: "Compress PDF",
     hub: "documents",
+    section: "Improve",
     blurb: "Make a PDF smaller so it fits an upload limit.",
     keywords: ["shrink", "reduce size", "optimise"],
     accepts: ["pdf"],
     extensions: ["pdf"],
     multiple: true,
+    popular: true,
+    status: "soon",
+  },
+  {
+    slug: "compress-to-size",
+    name: "Fit under a size limit",
+    hub: "documents",
+    section: "Improve",
+    blurb: "Squeeze a file until it slips under the limit a form demands.",
+    keywords: ["under 2mb", "500kb", "upload limit", "form", "exam", "target size"],
+    accepts: ["pdf", "image"],
+    multiple: true,
+    popular: true,
     status: "soon",
   },
   {
     slug: "pdf-to-image",
     name: "PDF to JPG",
     hub: "documents",
+    section: "Convert",
     blurb: "Turn every page of a PDF into a picture.",
     keywords: ["png", "jpeg", "export pages", "screenshot"],
     accepts: ["pdf"],
     extensions: ["pdf"],
+    popular: true,
     status: "soon",
   },
   {
     slug: "image-to-pdf",
     name: "Images to PDF",
     hub: "documents",
+    section: "Convert",
     blurb: "Put your photos or scans into a single PDF.",
     keywords: ["jpg to pdf", "png to pdf", "scan"],
     accepts: ["image"],
     multiple: true,
+    popular: true,
     status: "ready",
     load: () => import("../tools/ImagesToPdf"),
   },
@@ -163,6 +202,7 @@ export const TOOLS: ToolDef[] = [
     slug: "page-numbers",
     name: "Add page numbers",
     hub: "documents",
+    section: "Edit",
     blurb: "Number the pages, with headers and footers if you want them.",
     keywords: ["footer", "header", "numbering"],
     accepts: ["pdf"],
@@ -174,6 +214,7 @@ export const TOOLS: ToolDef[] = [
     slug: "watermark-pdf",
     name: "Watermark PDF",
     hub: "documents",
+    section: "Edit",
     blurb: "Stamp text or a logo across every page.",
     keywords: ["stamp", "draft", "confidential", "logo"],
     accepts: ["pdf"],
@@ -186,18 +227,32 @@ export const TOOLS: ToolDef[] = [
     slug: "sign-pdf",
     name: "Sign PDF",
     hub: "documents",
+    section: "Edit",
     blurb: "Draw, type or upload a signature and place it on the page.",
     keywords: ["signature", "e-sign", "initials"],
     accepts: ["pdf"],
     extensions: ["pdf"],
+    popular: true,
     status: "soon",
   },
   {
     slug: "fill-forms",
     name: "Fill PDF forms",
     hub: "documents",
+    section: "Edit",
     blurb: "Fill in a form and lock the answers so they can't be changed.",
     keywords: ["form", "flatten", "acroform"],
+    accepts: ["pdf"],
+    extensions: ["pdf"],
+    status: "soon",
+  },
+  {
+    slug: "edit-pdf-text",
+    name: "Edit PDF text",
+    hub: "documents",
+    section: "Edit",
+    blurb: "Cover up wrong text and type the right text over it.",
+    keywords: ["change text", "fix typo", "whiteout"],
     accepts: ["pdf"],
     extensions: ["pdf"],
     status: "soon",
@@ -206,6 +261,7 @@ export const TOOLS: ToolDef[] = [
     slug: "protect-pdf",
     name: "Password protect",
     hub: "documents",
+    section: "Secure",
     blurb: "Lock a PDF with a password.",
     keywords: ["encrypt", "lock", "secure"],
     accepts: ["pdf"],
@@ -217,6 +273,7 @@ export const TOOLS: ToolDef[] = [
     slug: "unlock-pdf",
     name: "Remove password",
     hub: "documents",
+    section: "Secure",
     blurb: "Take the password off a PDF you can already open.",
     keywords: ["decrypt", "unlock"],
     accepts: ["pdf"],
@@ -227,6 +284,7 @@ export const TOOLS: ToolDef[] = [
     slug: "redact-pdf",
     name: "Redact PDF",
     hub: "documents",
+    section: "Secure",
     blurb: "Black out private details so they're really gone, not just hidden.",
     keywords: ["black out", "censor", "hide", "private"],
     accepts: ["pdf"],
@@ -237,6 +295,7 @@ export const TOOLS: ToolDef[] = [
     slug: "ocr-pdf",
     name: "Make a scan searchable",
     hub: "documents",
+    section: "Improve",
     blurb: "Read the text in a scanned PDF so you can search and copy it.",
     keywords: ["ocr", "scan", "recognise text", "searchable"],
     accepts: ["pdf", "image"],
@@ -246,16 +305,19 @@ export const TOOLS: ToolDef[] = [
     slug: "pdf-to-word",
     name: "PDF to Word",
     hub: "documents",
+    section: "Convert",
     blurb: "Turn a PDF into an editable .docx document.",
     keywords: ["docx", "convert", "editable"],
     accepts: ["pdf"],
     extensions: ["pdf"],
+    popular: true,
     status: "soon",
   },
   {
     slug: "word-to-pdf",
     name: "Word to PDF",
     hub: "documents",
+    section: "Convert",
     blurb: "Turn a .docx into a PDF anyone can open.",
     keywords: ["docx", "doc", "convert"],
     accepts: ["document"],
@@ -267,18 +329,9 @@ export const TOOLS: ToolDef[] = [
     slug: "pdf-to-text",
     name: "PDF to text",
     hub: "documents",
+    section: "Convert",
     blurb: "Pull the plain text or Markdown out of a PDF.",
     keywords: ["extract text", "markdown", "copy"],
-    accepts: ["pdf"],
-    extensions: ["pdf"],
-    status: "soon",
-  },
-  {
-    slug: "edit-pdf-text",
-    name: "Edit PDF text",
-    hub: "documents",
-    blurb: "Cover up wrong text and type the right text over it.",
-    keywords: ["change text", "fix typo", "whiteout"],
     accepts: ["pdf"],
     extensions: ["pdf"],
     status: "soon",
@@ -289,26 +342,31 @@ export const TOOLS: ToolDef[] = [
     slug: "convert-image",
     name: "Convert image",
     hub: "images",
+    section: "Convert & compress",
     blurb: "Change between JPG, PNG, WebP, AVIF, HEIC and more.",
     keywords: ["jpg", "png", "webp", "avif", "heic", "format"],
     accepts: ["image"],
     multiple: true,
+    popular: true,
     status: "soon",
   },
   {
     slug: "compress-image",
     name: "Compress image",
     hub: "images",
+    section: "Convert & compress",
     blurb: "Shrink a photo with a live before-and-after view.",
     keywords: ["reduce size", "optimise", "smaller"],
     accepts: ["image"],
     multiple: true,
+    popular: true,
     status: "soon",
   },
   {
     slug: "resize-image",
     name: "Resize image",
     hub: "images",
+    section: "Resize & crop",
     blurb: "Set an exact width and height, or scale by percentage.",
     keywords: ["scale", "dimensions", "width", "height"],
     accepts: ["image"],
@@ -319,6 +377,7 @@ export const TOOLS: ToolDef[] = [
     slug: "crop-image",
     name: "Crop image",
     hub: "images",
+    section: "Resize & crop",
     blurb: "Trim a picture down, freehand or to a set aspect ratio.",
     keywords: ["trim", "cut", "aspect ratio"],
     accepts: ["image"],
@@ -328,6 +387,7 @@ export const TOOLS: ToolDef[] = [
     slug: "rotate-image",
     name: "Rotate & flip",
     hub: "images",
+    section: "Resize & crop",
     blurb: "Turn a sideways photo the right way up.",
     keywords: ["turn", "mirror", "straighten", "orientation"],
     accepts: ["image"],
@@ -338,6 +398,7 @@ export const TOOLS: ToolDef[] = [
     slug: "watermark-image",
     name: "Watermark images",
     hub: "images",
+    section: "Edit",
     blurb: "Add your text or logo to a whole batch of photos.",
     keywords: ["logo", "brand", "stamp", "copyright"],
     accepts: ["image"],
@@ -345,9 +406,21 @@ export const TOOLS: ToolDef[] = [
     status: "soon",
   },
   {
+    slug: "passport-photo",
+    name: "Passport photo",
+    hub: "images",
+    section: "Generate",
+    blurb: "Crop a photo to passport size and lay out a sheet to print.",
+    keywords: ["id photo", "visa", "35x45", "2x2", "print sheet"],
+    accepts: ["image"],
+    popular: true,
+    status: "soon",
+  },
+  {
     slug: "favicon-generator",
     name: "Favicon generator",
     hub: "images",
+    section: "Generate",
     blurb: "One picture in, a complete set of website icons out.",
     keywords: ["icon", "app icon", "manifest", "apple touch"],
     accepts: ["image"],
@@ -357,9 +430,107 @@ export const TOOLS: ToolDef[] = [
     slug: "palette-extractor",
     name: "Get colours from an image",
     hub: "images",
+    section: "Generate",
     blurb: "Pull the main colours out of a picture as hex codes.",
     keywords: ["colour", "color", "palette", "hex", "swatch"],
     accepts: ["image"],
+    status: "soon",
+  },
+
+  // ------------------------------------------------------------------- Create
+  {
+    slug: "resume-maker",
+    name: "Resume builder",
+    hub: "create",
+    section: "Documents",
+    blurb: "Build a CV that gets past the robots, and export it as PDF or Word.",
+    keywords: ["cv", "curriculum vitae", "job", "ats", "biodata", "template"],
+    accepts: [],
+    popular: true,
+    status: "soon",
+  },
+  {
+    slug: "invoice-maker",
+    name: "Invoice maker",
+    hub: "create",
+    section: "Documents",
+    blurb: "Make a proper invoice, with GST worked out for you.",
+    keywords: ["bill", "gst", "tax invoice", "freelance", "billing"],
+    accepts: [],
+    popular: true,
+    status: "soon",
+  },
+  {
+    slug: "quotation-maker",
+    name: "Quotation",
+    hub: "create",
+    section: "Documents",
+    blurb: "Send a priced quote or estimate before the work starts.",
+    keywords: ["quote", "estimate", "proposal"],
+    accepts: [],
+    status: "soon",
+  },
+  {
+    slug: "receipt-maker",
+    name: "Receipt",
+    hub: "create",
+    section: "Documents",
+    blurb: "Give someone proof that they've paid.",
+    keywords: ["payment", "proof", "acknowledgement"],
+    accepts: [],
+    status: "soon",
+  },
+  {
+    slug: "text-to-pdf",
+    name: "Text to PDF",
+    hub: "create",
+    section: "Documents",
+    blurb: "Write or paste text and get a properly typeset PDF.",
+    keywords: ["write", "markdown", "document", "typeset", "report"],
+    accepts: ["text"],
+    popular: true,
+    status: "soon",
+  },
+  {
+    slug: "letter-writer",
+    name: "Letter",
+    hub: "create",
+    section: "Documents",
+    blurb: "Write a formal letter or covering letter on a proper layout.",
+    keywords: ["cover letter", "formal", "application", "resignation"],
+    accepts: [],
+    status: "soon",
+  },
+  {
+    slug: "qr-generator",
+    name: "QR code generator",
+    hub: "create",
+    section: "Codes",
+    blurb: "Make a QR code for a link, WiFi, contact card or plain text.",
+    keywords: ["qr", "barcode", "wifi", "vcard", "link", "scan"],
+    accepts: [],
+    popular: true,
+    status: "ready",
+    load: () => import("../tools/QrGenerator"),
+  },
+  {
+    slug: "qr-reader",
+    name: "Read a QR code",
+    hub: "create",
+    section: "Codes",
+    blurb: "Point your camera at a code, or upload a picture of one.",
+    keywords: ["scan", "decode", "camera"],
+    accepts: ["image"],
+    status: "soon",
+  },
+  {
+    slug: "barcode-generator",
+    name: "Barcode generator",
+    hub: "create",
+    section: "Codes",
+    blurb: "Make EAN, UPC and Code 128 barcodes.",
+    keywords: ["ean", "upc", "code128", "product"],
+    accepts: [],
     status: "soon",
   },
 
@@ -368,6 +539,7 @@ export const TOOLS: ToolDef[] = [
     slug: "convert-video",
     name: "Convert video",
     hub: "media",
+    section: "Convert",
     blurb: "Change a video between MP4, WebM, MKV and MOV.",
     keywords: ["mp4", "webm", "mkv", "mov", "format"],
     accepts: ["video"],
@@ -378,6 +550,7 @@ export const TOOLS: ToolDef[] = [
     slug: "convert-audio",
     name: "Convert audio",
     hub: "media",
+    section: "Convert",
     blurb: "Change a sound file between MP3, WAV, OGG, FLAC and M4A.",
     keywords: ["mp3", "wav", "ogg", "flac", "m4a", "format"],
     accepts: ["audio"],
@@ -388,16 +561,29 @@ export const TOOLS: ToolDef[] = [
     slug: "extract-audio",
     name: "Get the audio from a video",
     hub: "media",
+    section: "Convert",
     blurb: "Save just the sound from a video file.",
     keywords: ["rip audio", "mp3 from video", "soundtrack"],
     accepts: ["video"],
     multiple: true,
+    popular: true,
+    status: "soon",
+  },
+  {
+    slug: "video-to-gif",
+    name: "Video to GIF",
+    hub: "media",
+    section: "Convert",
+    blurb: "Turn a short clip into an animated GIF.",
+    keywords: ["gif", "animation", "loop"],
+    accepts: ["video"],
     status: "soon",
   },
   {
     slug: "trim-media",
     name: "Trim video or audio",
     hub: "media",
+    section: "Edit",
     blurb: "Keep the part you want and cut off the rest.",
     keywords: ["cut", "clip", "shorten", "crop"],
     accepts: ["video", "audio"],
@@ -407,6 +593,7 @@ export const TOOLS: ToolDef[] = [
     slug: "compress-video",
     name: "Compress video",
     hub: "media",
+    section: "Edit",
     blurb: "Make a video smaller, or drop it to a lower resolution.",
     keywords: ["shrink", "reduce size", "720p", "1080p"],
     accepts: ["video"],
@@ -416,6 +603,7 @@ export const TOOLS: ToolDef[] = [
     slug: "mute-video",
     name: "Mute a video",
     hub: "media",
+    section: "Edit",
     blurb: "Strip the sound out and keep the picture.",
     keywords: ["remove audio", "silent", "no sound"],
     accepts: ["video"],
@@ -423,79 +611,14 @@ export const TOOLS: ToolDef[] = [
     status: "soon",
   },
   {
-    slug: "video-to-gif",
-    name: "Video to GIF",
-    hub: "media",
-    blurb: "Turn a short clip into an animated GIF.",
-    keywords: ["gif", "animation", "loop"],
-    accepts: ["video"],
-    status: "soon",
-  },
-  {
     slug: "media-info",
     name: "Media details",
     hub: "media",
+    section: "Inspect",
     blurb: "See the codec, resolution, bitrate and length of a file.",
     keywords: ["metadata", "codec", "resolution", "bitrate", "info"],
     accepts: ["video", "audio"],
     multiple: true,
-    status: "soon",
-  },
-
-  // ------------------------------------------------------------------- Create
-  {
-    slug: "text-to-pdf",
-    name: "Text to PDF",
-    hub: "create",
-    blurb: "Write or paste text and get a properly typeset PDF.",
-    keywords: ["write", "markdown", "document", "typeset", "letter", "report"],
-    accepts: ["text"],
-    status: "soon",
-  },
-  {
-    slug: "qr-generator",
-    name: "QR code generator",
-    hub: "create",
-    blurb: "Make a QR code for a link, WiFi, contact card or plain text.",
-    keywords: ["qr", "barcode", "wifi", "vcard", "link", "scan"],
-    accepts: [],
-    status: "ready",
-    load: () => import("../tools/QrGenerator"),
-  },
-  {
-    slug: "qr-reader",
-    name: "Read a QR code",
-    hub: "create",
-    blurb: "Point your camera at a code, or upload a picture of one.",
-    keywords: ["scan", "decode", "camera"],
-    accepts: ["image"],
-    status: "soon",
-  },
-  {
-    slug: "barcode-generator",
-    name: "Barcode generator",
-    hub: "create",
-    blurb: "Make EAN, UPC and Code 128 barcodes.",
-    keywords: ["ean", "upc", "code128", "product"],
-    accepts: [],
-    status: "soon",
-  },
-  {
-    slug: "invoice-maker",
-    name: "Invoice maker",
-    hub: "create",
-    blurb: "Fill in a simple form and get a clean invoice PDF.",
-    keywords: ["bill", "receipt", "quote", "gst"],
-    accepts: [],
-    status: "soon",
-  },
-  {
-    slug: "resume-maker",
-    name: "Resume maker",
-    hub: "create",
-    blurb: "Build a tidy one-page CV and export it as a PDF.",
-    keywords: ["cv", "curriculum vitae", "job"],
-    accepts: [],
     status: "soon",
   },
 
@@ -508,6 +631,7 @@ export const TOOLS: ToolDef[] = [
     keywords: ["cutout", "transparent", "bg remove", "isolate"],
     accepts: ["image"],
     multiple: true,
+    popular: true,
     status: "soon",
   },
   {
@@ -551,6 +675,24 @@ export const TOOLS: ToolDef[] = [
     status: "soon",
   },
   {
+    slug: "word-count",
+    name: "Count words",
+    hub: "utilities",
+    blurb: "Words, characters and reading time for any text.",
+    keywords: ["character count", "reading time", "essay", "limit"],
+    accepts: ["text"],
+    status: "soon",
+  },
+  {
+    slug: "case-converter",
+    name: "Change text case",
+    hub: "utilities",
+    blurb: "UPPERCASE, lowercase, Title Case and back again.",
+    keywords: ["uppercase", "lowercase", "title case", "sentence case"],
+    accepts: ["text"],
+    status: "soon",
+  },
+  {
     slug: "base64",
     name: "Base64 encode / decode",
     hub: "utilities",
@@ -581,6 +723,31 @@ export function toolsInHub(hub: HubId): ToolDef[] {
   return TOOLS.filter((t) => t.hub === hub);
 }
 
+/** Tools grouped under their hub's section headings, in display order. */
+export function sectionsInHub(hub: HubId): Array<{ name: string; tools: ToolDef[] }> {
+  const def = HUBS.find((h) => h.id === hub);
+  const tools = toolsInHub(hub);
+  if (!def || def.sections.length === 0) return [{ name: "", tools }];
+
+  const groups = def.sections.map((name) => ({
+    name,
+    tools: tools.filter((t) => t.section === name),
+  }));
+
+  // Anything without a matching section still has to appear somewhere.
+  const orphans = tools.filter((t) => !t.section || !def.sections.includes(t.section));
+  if (orphans.length > 0) groups.push({ name: "More", tools: orphans });
+
+  return groups.filter((g) => g.tools.length > 0);
+}
+
+/** The homepage's "Most used" row: popular tools, working ones first. */
+export function popularTools(limit = 8): ToolDef[] {
+  return TOOLS.filter((t) => t.popular)
+    .sort((a, b) => Number(b.status === "ready") - Number(a.status === "ready"))
+    .slice(0, limit);
+}
+
 /** Tools that can do something with a file of this kind, ready ones first. */
 export function toolsForKind(kind: FileKind, ext: string): ToolDef[] {
   return TOOLS.filter((t) => {
@@ -607,6 +774,7 @@ export function searchTools(query: string): ToolDef[] {
 
     if (score > 0) {
       if (tool.status === "ready") score += 10;
+      if (tool.popular) score += 5;
       scored.push({ tool, score });
     }
   }

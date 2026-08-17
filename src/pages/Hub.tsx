@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { ToolCard } from "../components/ToolCard";
-import { HUBS, toolsInHub, type HubId } from "../lib/registry";
+import { HUBS, sectionsInHub, toolsInHub, type HubId } from "../lib/registry";
 
 export default function Hub() {
   const { hubId } = useParams<{ hubId: string }>();
@@ -18,6 +18,7 @@ export default function Hub() {
 
   const tools = toolsInHub(hub.id as HubId);
   const ready = tools.filter((t) => t.status === "ready");
+  const sections = sectionsInHub(hub.id as HubId);
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-10 sm:px-6 sm:pt-14">
@@ -31,9 +32,20 @@ export default function Hub() {
         </p>
       </header>
 
-      <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {tools.map((tool) => (
-          <ToolCard key={tool.slug} tool={tool} />
+      <div className="mt-10 space-y-10">
+        {sections.map((section) => (
+          <section key={section.name || "all"}>
+            {section.name && (
+              <h2 className="mb-4 text-xs font-semibold tracking-wide text-faint uppercase">
+                {section.name}
+              </h2>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {section.tools.map((tool) => (
+                <ToolCard key={tool.slug} tool={tool} />
+              ))}
+            </div>
+          </section>
         ))}
       </div>
     </div>

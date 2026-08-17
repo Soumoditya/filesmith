@@ -212,7 +212,7 @@ export default function WatermarkPdf() {
                         type="color"
                         value={colour}
                         onChange={(e) => setColour(e.target.value)}
-                        className="h-10 w-12 cursor-pointer rounded-lg border border-line-strong bg-surface p-1"
+                        className="h-10 w-12 touch:h-11 touch:w-14 cursor-pointer rounded-lg border border-line-strong bg-surface p-1"
                       />
                       <TextInput
                         value={colour}

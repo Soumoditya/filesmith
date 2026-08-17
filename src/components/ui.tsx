@@ -33,9 +33,14 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
     "bg-surface text-danger border border-line-strong hover:border-danger disabled:hover:border-line-strong",
 };
 
+/**
+ * On a mouse these stay compact; on a touch screen they grow to a
+ * comfortable 44px. Icon-only buttons get a matching minimum width, since a
+ * tall-but-narrow target is just as awkward to hit.
+ */
 const BUTTON_SIZES: Record<ButtonSize, string> = {
-  sm: "h-8 px-3 text-sm gap-1.5",
-  md: "h-10 px-4 text-sm gap-2",
+  sm: "h-8 px-3 text-sm gap-1.5 touch:h-11 touch:min-w-11",
+  md: "h-10 px-4 text-sm gap-2 touch:h-11 touch:min-w-11",
   lg: "h-12 px-6 text-base gap-2",
 };
 
@@ -121,7 +126,7 @@ export function TextInput({
   className,
   ...rest
 }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={clsx(CONTROL_BASE, "h-10 px-3 text-sm", className)} {...rest} />;
+  return <input className={clsx(CONTROL_BASE, "h-10 touch:h-11 px-3 text-sm", className)} {...rest} />;
 }
 
 export function Textarea({
@@ -142,7 +147,7 @@ export function Select({
   ...rest
 }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={clsx(CONTROL_BASE, "h-10 px-3 text-sm", className)} {...rest}>
+    <select className={clsx(CONTROL_BASE, "h-10 touch:h-11 px-3 text-sm", className)} {...rest}>
       {children}
     </select>
   );
@@ -159,10 +164,10 @@ export function Checkbox({
       <input
         id={id}
         type="checkbox"
-        className="mt-0.5 size-4 shrink-0 rounded border-line-strong accent-accent cursor-pointer"
+        className="mt-0.5 size-4 touch:size-5 shrink-0 rounded border-line-strong accent-accent cursor-pointer"
         {...rest}
       />
-      <label htmlFor={id} className="text-sm text-ink cursor-pointer select-none leading-snug">
+      <label htmlFor={id} className="text-sm text-ink cursor-pointer select-none leading-snug touch:py-2.5">
         {label}
       </label>
     </div>
@@ -196,7 +201,7 @@ export function Slider({
         id={id}
         type="range"
         value={value}
-        className="w-full accent-accent cursor-pointer"
+        className="w-full touch:h-6 accent-accent cursor-pointer"
         {...rest}
       />
     </div>
@@ -231,7 +236,7 @@ export function SegmentedControl<T extends string>({
           aria-checked={value === opt.value}
           onClick={() => onChange(opt.value)}
           className={clsx(
-            "px-3 h-8 rounded-md text-sm font-medium transition-colors",
+            "px-3 h-8 touch:h-11 rounded-md text-sm font-medium transition-colors",
             value === opt.value
               ? "bg-surface text-ink shadow-sm"
               : "text-muted hover:text-ink",
