@@ -8,7 +8,11 @@ import {
   organise,
   pageCount,
   protect,
+  listFormFields,
+  overlayText,
+  placeImage,
   rebuildFromPageImages,
+  replacePagesWithImages,
   shrinkLossless,
   splitPages,
   unlock,
@@ -362,6 +366,125 @@ describe("shrinkLossless", () => {
     const reopened = await PDFDocument.load(out);
     expect(reopened.getAuthor() || "").toBe("");
     expect(reopened.getTitle() || "").toBe("");
+  });
+});
+
+describe("replacePagesWithImages", () => {
+  const png = () =>
+    TINY_PNG.buffer.slice(
+      TINY_PNG.byteOffset,
+      TINY_PNG.byteOffset + TINY_PNG.byteLength,
+    ) as ArrayBuffer;
+
+  it("destroys the text on a replaced page, and keeps it everywhere else", async () => {
+    // This is the guarantee redaction depends on. Drawing a black box over
+    // text leaves it extractable underneath; replacing the page must not.
+    const out = await replacePagesWithImages(three, [
+      { page: 2, data: png(), format: "png" },
+    ]);
+
+    const labels = await labelsOf(out);
+    expect(labels[0]).toBe("A1");
+    expect(labels[1]).toBe(""); // page 2 is now a picture — no text at all
+    expect(labels[2]).toBe("A3");
+  });
+
+  it("keeps the page count and each page's original size", async () => {
+    const out = await replacePagesWithImages(three, [
+      { page: 1, data: png(), format: "png" },
+    ]);
+    const doc = await PDFDocument.load(out);
+    expect(doc.getPageCount()).toBe(3);
+    // Page 1 was 400 points wide in the fixture; the 2x2 image must not
+    // shrink it to 2 points.
+    expect(Math.round(doc.getPage(0).getSize().width)).toBe(400);
+  });
+
+  it("copies everything through untouched when nothing is replaced", async () => {
+    const out = await replacePagesWithImages(three, []);
+    expect(await labelsOf(out)).toEqual(["A1", "A2", "A3"]);
+  });
+
+  it("reports progress across all pages, not just replaced ones", async () => {
+    const seen: number[] = [];
+    await replacePagesWithImages(
+      three,
+      [{ page: 2, data: png(), format: "png" }],
+      (done) => seen.push(done),
+    );
+    expect(seen).toEqual([1, 2, 3]);
+  });
+});
+
+describe("overlayText", () => {
+  it("writes the new text and leaves the page count alone", async () => {
+    const out = await overlayText(three, [
+      {
+        page: 1,
+        x: 50,
+        y: 400,
+        width: 200,
+        height: 20,
+        text: "Corrected",
+        fontSize: 12,
+      },
+    ]);
+    expect(await pageCount(out)).toBe(3);
+    const doc = await PDFDocument.load(out);
+    expect(drawnText(doc, 0)).toContain("Corrected");
+  });
+
+  it("leaves the original text in the file, which is why it isn't redaction", async () => {
+    // Stated plainly in the tool's own warning; asserted here so the
+    // behaviour can't drift into looking like redaction by accident.
+    const out = await overlayText(three, [
+      { page: 1, x: 0, y: 0, width: 400, height: 600, text: "New", fontSize: 12 },
+    ]);
+    const doc = await PDFDocument.load(out);
+    expect(drawnText(doc, 0)).toContain("A1");
+  });
+
+  it("can cover without writing anything", async () => {
+    const out = await overlayText(three, [
+      { page: 1, x: 10, y: 10, width: 50, height: 20, text: "", fontSize: 12 },
+    ]);
+    expect(await pageCount(out)).toBe(3);
+  });
+
+  it("ignores an edit pointing at a page that doesn't exist", async () => {
+    const out = await overlayText(three, [
+      { page: 99, x: 0, y: 0, width: 10, height: 10, text: "Nowhere", fontSize: 12 },
+    ]);
+    expect(await pageCount(out)).toBe(3);
+  });
+});
+
+describe("placeImage", () => {
+  it("stamps onto the pages named, and no others", async () => {
+    const data = TINY_PNG.buffer.slice(
+      TINY_PNG.byteOffset,
+      TINY_PNG.byteOffset + TINY_PNG.byteLength,
+    ) as ArrayBuffer;
+
+    const before = (await PDFDocument.load(three)).getPage(2);
+    const beforeSize = before.getSize();
+
+    const out = await placeImage(three, { data, format: "png" }, [
+      { page: 1, x: 20, y: 20, width: 80, height: 40 },
+      { page: 1, x: 200, y: 20, width: 80, height: 40 },
+    ]);
+
+    const doc = await PDFDocument.load(out);
+    expect(doc.getPageCount()).toBe(3);
+    // Original content survives; the stamp is added, not substituted.
+    expect(drawnText(doc, 0)).toContain("A1");
+    expect(doc.getPage(2).getSize()).toEqual(beforeSize);
+  });
+});
+
+describe("form fields", () => {
+  it("reports no fields for a document that has no form", async () => {
+    expect(await listFormFields(three)).toEqual([]);
   });
 });
 

@@ -57,6 +57,26 @@ const api = {
   watermark: async (file: File, opts: ops.WatermarkOptions) =>
     send(await ops.watermark(file, opts)),
 
+  replacePagesWithImages: async (
+    file: File,
+    replacements: Array<{ page: number; data: ArrayBuffer; format: "png" | "jpg" }>,
+    onProgress: ops.ProgressFn,
+  ) => send(await ops.replacePagesWithImages(file, replacements, onProgress)),
+
+  placeImage: async (
+    file: File,
+    image: { data: ArrayBuffer; format: "png" | "jpg" },
+    placements: ops.Placement[],
+  ) => send(await ops.placeImage(file, image, placements)),
+
+  overlayText: async (file: File, edits: ops.TextEdit[]) =>
+    send(await ops.overlayText(file, edits)),
+
+  listFormFields: (file: File) => ops.listFormFields(file),
+
+  fillForm: async (file: File, values: Record<string, string>, flatten: boolean) =>
+    send(await ops.fillForm(file, values, flatten)),
+
   protect: async (file: File, opts: ops.ProtectOptions) =>
     send(await ops.protect(file, opts)),
 

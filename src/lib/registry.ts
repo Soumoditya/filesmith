@@ -236,7 +236,8 @@ export const TOOLS: ToolDef[] = [
     accepts: ["pdf"],
     extensions: ["pdf"],
     popular: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/SignPdf"),
   },
   {
     slug: "fill-forms",
@@ -247,7 +248,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["form", "flatten", "acroform"],
     accepts: ["pdf"],
     extensions: ["pdf"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/FillForms"),
   },
   {
     slug: "edit-pdf-text",
@@ -258,7 +260,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["change text", "fix typo", "whiteout"],
     accepts: ["pdf"],
     extensions: ["pdf"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/EditPdfText"),
   },
   {
     slug: "protect-pdf",
@@ -294,7 +297,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["black out", "censor", "hide", "private"],
     accepts: ["pdf"],
     extensions: ["pdf"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/RedactPdf"),
   },
   {
     slug: "ocr-pdf",
@@ -316,7 +320,8 @@ export const TOOLS: ToolDef[] = [
     accepts: ["pdf"],
     extensions: ["pdf"],
     popular: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/PdfToWord"),
   },
   {
     slug: "word-to-pdf",
@@ -328,7 +333,8 @@ export const TOOLS: ToolDef[] = [
     accepts: ["document"],
     extensions: ["docx"],
     multiple: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/WordToPdf"),
   },
   {
     slug: "pdf-to-text",

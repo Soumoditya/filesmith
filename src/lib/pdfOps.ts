@@ -380,6 +380,264 @@ export async function watermark(
   return finish(doc);
 }
 
+/**
+ * Rebuilds a document, swapping specific pages for flattened images and
+ * copying the rest untouched.
+ *
+ * This is what makes redaction real. Drawing a black rectangle over text
+ * leaves the text sitting underneath, fully extractable by anyone who selects
+ * it or runs a parser — a mistake that has leaked court filings and contracts
+ * repeatedly. Replacing the page with a picture of itself, with the blackout
+ * already burned in, genuinely destroys the content. Pages with nothing to
+ * hide keep their real text, so the document stays as searchable as possible.
+ */
+export async function replacePagesWithImages(
+  source: PdfSource,
+  replacements: Array<{
+    page: number;
+    data: ArrayBuffer;
+    format: "png" | "jpg";
+  }>,
+  onProgress?: ProgressFn,
+): Promise<Uint8Array> {
+  const src = await load(source);
+  const out = await PDFDocument.create();
+  const byPage = new Map(replacements.map((r) => [r.page, r]));
+  const total = src.getPageCount();
+
+  for (let index = 0; index < total; index++) {
+    const replacement = byPage.get(index + 1);
+
+    if (replacement) {
+      const original = src.getPage(index);
+      const { width, height } = original.getSize();
+      const image =
+        replacement.format === "jpg"
+          ? await out.embedJpg(replacement.data)
+          : await out.embedPng(replacement.data);
+
+      const page = out.addPage([width, height]);
+      page.drawImage(image, { x: 0, y: 0, width, height });
+    } else {
+      const [copied] = await out.copyPages(src, [index]);
+      out.addPage(copied);
+    }
+
+    onProgress?.(index + 1, total);
+  }
+
+  return finish(out);
+}
+
+/** Where to stamp something, in points from the page's bottom-left corner. */
+export interface Placement {
+  /** 1-based page number. */
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Degrees anticlockwise. */
+  rotate?: number;
+  opacity?: number;
+}
+
+/** Stamps one image — a signature, initials, a logo — at each placement. */
+export async function placeImage(
+  source: PdfSource,
+  image: { data: ArrayBuffer; format: "png" | "jpg" },
+  placements: Placement[],
+): Promise<Uint8Array> {
+  const doc = await load(source);
+  const embedded =
+    image.format === "jpg"
+      ? await doc.embedJpg(image.data)
+      : await doc.embedPng(image.data);
+
+  const pages = doc.getPages();
+
+  for (const spot of placements) {
+    const page = pages[spot.page - 1];
+    if (!page) continue;
+    page.drawImage(embedded, {
+      x: spot.x,
+      y: spot.y,
+      width: spot.width,
+      height: spot.height,
+      rotate: degrees(spot.rotate ?? 0),
+      opacity: spot.opacity ?? 1,
+    });
+  }
+
+  return finish(doc);
+}
+
+/** Red, green and blue as 0-1 fractions, matching pdf-lib's `rgb()`. */
+export interface Colour {
+  r: number;
+  g: number;
+  b: number;
+}
+
+export interface TextEdit extends Placement {
+  text: string;
+  fontSize: number;
+  colour?: Colour;
+  /** Paints this colour behind the text first, hiding what was there. */
+  cover?: Colour | null;
+}
+
+/**
+ * Covers a region and writes new text over it.
+ *
+ * This is what "edit PDF text" honestly is without a full layout engine for
+ * arbitrary documents: the old glyphs are hidden, not deleted, so anyone
+ * extracting text still finds them. Fine for fixing a typo before printing;
+ * not a way to hide anything sensitive — that's what redaction is for.
+ */
+export async function overlayText(
+  source: PdfSource,
+  edits: TextEdit[],
+): Promise<Uint8Array> {
+  const doc = await load(source);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const pages = doc.getPages();
+
+  for (const edit of edits) {
+    const page = pages[edit.page - 1];
+    if (!page) continue;
+
+    if (edit.cover !== null) {
+      const cover = edit.cover ?? { r: 1, g: 1, b: 1 };
+      page.drawRectangle({
+        x: edit.x,
+        y: edit.y,
+        width: edit.width,
+        height: edit.height,
+        color: rgb(cover.r, cover.g, cover.b),
+      });
+    }
+
+    if (edit.text) {
+      const colour = edit.colour ?? { r: 0, g: 0, b: 0 };
+      page.drawText(edit.text, {
+        x: edit.x + 1,
+        // Sit the baseline inside the box rather than on its floor.
+        y: edit.y + (edit.height - edit.fontSize) / 2 + edit.fontSize * 0.22,
+        size: edit.fontSize,
+        font,
+        color: rgb(colour.r, colour.g, colour.b),
+      });
+    }
+  }
+
+  return finish(doc);
+}
+
+export interface FormField {
+  name: string;
+  kind: "text" | "checkbox" | "radio" | "dropdown" | "option" | "unknown";
+  value: string;
+  /** For dropdowns and radio groups. */
+  options?: string[];
+  readOnly?: boolean;
+}
+
+/** Reads the fillable fields out of a form, with their current values. */
+export async function listFormFields(source: PdfSource): Promise<FormField[]> {
+  const doc = await load(source);
+
+  let form;
+  try {
+    form = doc.getForm();
+  } catch {
+    return [];
+  }
+
+  return form.getFields().map((field) => {
+    const name = field.getName();
+    const type = field.constructor.name;
+
+    try {
+      if (type === "PDFTextField") {
+        const f = field as unknown as { getText: () => string | undefined };
+        return { name, kind: "text" as const, value: f.getText() ?? "" };
+      }
+      if (type === "PDFCheckBox") {
+        const f = field as unknown as { isChecked: () => boolean };
+        return { name, kind: "checkbox" as const, value: f.isChecked() ? "on" : "" };
+      }
+      if (type === "PDFDropdown" || type === "PDFOptionList") {
+        const f = field as unknown as {
+          getSelected: () => string[];
+          getOptions: () => string[];
+        };
+        return {
+          name,
+          kind: type === "PDFDropdown" ? ("dropdown" as const) : ("option" as const),
+          value: f.getSelected()[0] ?? "",
+          options: f.getOptions(),
+        };
+      }
+      if (type === "PDFRadioGroup") {
+        const f = field as unknown as {
+          getSelected: () => string | undefined;
+          getOptions: () => string[];
+        };
+        return {
+          name,
+          kind: "radio" as const,
+          value: f.getSelected() ?? "",
+          options: f.getOptions(),
+        };
+      }
+    } catch {
+      // A malformed field shouldn't hide the rest of the form.
+    }
+
+    return { name, kind: "unknown" as const, value: "" };
+  });
+}
+
+/**
+ * Fills a form. Flattening bakes the answers into the page so they can't be
+ * changed — which is what people mean by "lock it before sending".
+ */
+export async function fillForm(
+  source: PdfSource,
+  values: Record<string, string>,
+  flatten: boolean,
+): Promise<Uint8Array> {
+  const doc = await load(source);
+  const form = doc.getForm();
+
+  for (const field of form.getFields()) {
+    const name = field.getName();
+    if (!(name in values)) continue;
+    const value = values[name];
+    const type = field.constructor.name;
+
+    try {
+      if (type === "PDFTextField") {
+        (field as unknown as { setText: (v: string) => void }).setText(value);
+      } else if (type === "PDFCheckBox") {
+        const box = field as unknown as { check: () => void; uncheck: () => void };
+        if (value) box.check();
+        else box.uncheck();
+      } else if (type === "PDFDropdown" || type === "PDFOptionList") {
+        if (value) (field as unknown as { select: (v: string) => void }).select(value);
+      } else if (type === "PDFRadioGroup") {
+        if (value) (field as unknown as { select: (v: string) => void }).select(value);
+      }
+    } catch {
+      // Skip a value the field won't accept rather than losing the whole fill.
+    }
+  }
+
+  if (flatten) form.flatten();
+  return finish(doc);
+}
+
 export async function protect(
   source: PdfSource,
   opts: ProtectOptions,
