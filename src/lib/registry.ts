@@ -565,7 +565,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["mp4", "webm", "mkv", "mov", "format"],
     accepts: ["video"],
     multiple: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/ConvertVideo"),
   },
   {
     slug: "convert-audio",
@@ -576,7 +577,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["mp3", "wav", "ogg", "flac", "m4a", "format"],
     accepts: ["audio"],
     multiple: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/ConvertAudio"),
   },
   {
     slug: "extract-audio",
@@ -588,7 +590,8 @@ export const TOOLS: ToolDef[] = [
     accepts: ["video"],
     multiple: true,
     popular: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/ExtractAudio"),
   },
   {
     slug: "video-to-gif",
@@ -598,7 +601,8 @@ export const TOOLS: ToolDef[] = [
     blurb: "Turn a short clip into an animated GIF.",
     keywords: ["gif", "animation", "loop"],
     accepts: ["video"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/VideoToGif"),
   },
   {
     slug: "trim-media",
@@ -608,7 +612,8 @@ export const TOOLS: ToolDef[] = [
     blurb: "Keep the part you want and cut off the rest.",
     keywords: ["cut", "clip", "shorten", "crop"],
     accepts: ["video", "audio"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/TrimMedia"),
   },
   {
     slug: "compress-video",
@@ -618,7 +623,8 @@ export const TOOLS: ToolDef[] = [
     blurb: "Make a video smaller, or drop it to a lower resolution.",
     keywords: ["shrink", "reduce size", "720p", "1080p"],
     accepts: ["video"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/CompressVideo"),
   },
   {
     slug: "mute-video",
@@ -629,7 +635,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["remove audio", "silent", "no sound"],
     accepts: ["video"],
     multiple: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/MuteVideo"),
   },
   {
     slug: "media-info",
@@ -640,7 +647,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["metadata", "codec", "resolution", "bitrate", "info"],
     accepts: ["video", "audio"],
     multiple: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/MediaInfo"),
   },
 
   // -------------------------------------------------------------------- Clean
