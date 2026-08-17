@@ -479,7 +479,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["bill", "gst", "tax invoice", "freelance", "billing"],
     accepts: [],
     popular: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/InvoiceMaker"),
   },
   {
     slug: "quotation-maker",
@@ -489,7 +490,8 @@ export const TOOLS: ToolDef[] = [
     blurb: "Send a priced quote or estimate before the work starts.",
     keywords: ["quote", "estimate", "proposal"],
     accepts: [],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/InvoiceMaker"),
   },
   {
     slug: "receipt-maker",
@@ -499,7 +501,8 @@ export const TOOLS: ToolDef[] = [
     blurb: "Give someone proof that they've paid.",
     keywords: ["payment", "proof", "acknowledgement"],
     accepts: [],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/InvoiceMaker"),
   },
   {
     slug: "text-to-pdf",
