@@ -513,7 +513,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["write", "markdown", "document", "typeset", "report"],
     accepts: ["text"],
     popular: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/TextToPdf"),
   },
   {
     slug: "letter-writer",
