@@ -48,6 +48,11 @@ export async function openPdf(
       ? new Uint8Array(file)
       : new Uint8Array(await file.arrayBuffer());
 
+  // Note for anyone debugging a preview that never appears: pdf.js drives
+  // rendering off animation frames, so `render()` never settles in a tab
+  // that isn't compositing (a hidden pane, or a background tab). Parsing
+  // still works there, which makes it look like a rendering bug. It resolves
+  // itself as soon as the tab is visible.
   const task = pdfjs.getDocument({ data, password });
 
   try {

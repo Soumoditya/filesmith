@@ -11,11 +11,17 @@ import { Notice } from "./ui";
 export function ToolShell({
   tool,
   caveat,
+  wide = false,
   children,
 }: {
   tool: ToolDef;
   /** An honest note about what this tool can't do well. Shown under the title. */
   caveat?: ReactNode;
+  /**
+   * Builders that put an editor beside a live preview need more room than a
+   * single-input tool; 3xl squeezes the form to about 380px.
+   */
+  wide?: boolean;
   children: ReactNode;
 }) {
   const hub = HUBS.find((h) => h.id === tool.hub);
@@ -30,7 +36,13 @@ export function ToolShell({
   }, [tool]);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 pt-8 pb-4 sm:px-6">
+    <div
+      className={
+        wide
+          ? "mx-auto max-w-7xl px-4 pt-8 pb-4 sm:px-6"
+          : "mx-auto max-w-3xl px-4 pt-8 pb-4 sm:px-6"
+      }
+    >
       <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm text-muted">
         <Link to="/" className="transition-colors hover:text-ink">
           Home

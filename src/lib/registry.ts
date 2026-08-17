@@ -447,7 +447,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["cv", "curriculum vitae", "job", "ats", "biodata", "template"],
     accepts: [],
     popular: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/ResumeBuilder"),
   },
   {
     slug: "invoice-maker",
