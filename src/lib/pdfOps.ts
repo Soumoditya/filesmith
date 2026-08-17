@@ -1,0 +1,382 @@
+import {
+  degrees,
+  PDFDocument,
+  rgb,
+  StandardFonts,
+  type PDFFont,
+  type PDFImage,
+  type PDFPage,
+} from "@cantoo/pdf-lib";
+
+/**
+ * Every PDF-writing operation, as plain async functions.
+ *
+ * These are kept free of any worker plumbing so they can be tested directly
+ * in Node — `workers/pdf.worker.ts` is only a thin Comlink shim over them.
+ *
+ * Reading and rendering live in `pdfRender.ts` (pdf.js). The split is
+ * deliberate: pdf.js reads and draws, pdf-lib edits and saves.
+ */
+
+export type ProgressFn = (done: number, total: number) => void;
+
+/** A byte source. Files are preferred at runtime; tests pass buffers. */
+export type PdfSource = File | ArrayBuffer | Uint8Array;
+
+export interface PageOp {
+  /** 1-based page number in the *original* document. */
+  source: number;
+  /** Extra rotation to apply, in degrees: 0, 90, 180 or 270. */
+  rotate: number;
+}
+
+export type Corner =
+  | "top-left"
+  | "top-centre"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-centre"
+  | "bottom-right";
+
+export interface PageNumberOptions {
+  position: Corner;
+  /** The number printed on the first numbered page. */
+  startAt: number;
+  /** Pages to leave unnumbered (1-based), e.g. a cover. */
+  skipPages: number[];
+  fontSize: number;
+  margin: number;
+  /** `{n}` and `{total}` are substituted. */
+  format: string;
+}
+
+export interface WatermarkOptions {
+  text: string;
+  fontSize: number;
+  opacity: number;
+  /** Degrees anticlockwise. */
+  angle: number;
+  colour: { r: number; g: number; b: number };
+  tile: boolean;
+}
+
+export interface ImagesToPdfOptions {
+  pageSize: "fit" | "a4" | "letter";
+  orientation: "auto" | "portrait" | "landscape";
+  margin: number;
+}
+
+export interface ProtectOptions {
+  userPassword: string;
+  ownerPassword?: string;
+  allowPrinting: boolean;
+  allowCopying: boolean;
+}
+
+const PAGE_SIZES = {
+  a4: [595.28, 841.89],
+  letter: [612, 792],
+} as const;
+
+async function bytesOf(source: PdfSource): Promise<ArrayBuffer | Uint8Array> {
+  return source instanceof ArrayBuffer || source instanceof Uint8Array
+    ? source
+    : await source.arrayBuffer();
+}
+
+/** `ignoreEncryption` opens PDFs carrying an owner password but no user
+ *  password — very common for bank and government documents. */
+async function load(source: PdfSource, password?: string): Promise<PDFDocument> {
+  return PDFDocument.load(await bytesOf(source), {
+    ignoreEncryption: true,
+    password,
+  });
+}
+
+async function finish(doc: PDFDocument): Promise<Uint8Array> {
+  doc.setProducer("Filesmith");
+  doc.setCreator("Filesmith");
+  return doc.save();
+}
+
+/**
+ * Decodes any image the browser understands into something pdf-lib can
+ * embed. JPEG and PNG go in untouched; everything else (WebP, AVIF, and HEIC
+ * where supported) is re-encoded through OffscreenCanvas.
+ */
+async function embedImage(doc: PDFDocument, file: File): Promise<PDFImage> {
+  const buffer = await file.arrayBuffer();
+  const head = new Uint8Array(buffer.slice(0, 8));
+
+  const isJpeg = head[0] === 0xff && head[1] === 0xd8;
+  const isPng =
+    head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47;
+
+  if (isJpeg) return doc.embedJpg(buffer);
+  if (isPng) return doc.embedPng(buffer);
+
+  const bitmap = await createImageBitmap(new Blob([buffer], { type: file.type }));
+  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Couldn't decode this image.");
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+
+  const png = await canvas.convertToBlob({ type: "image/png" });
+  return doc.embedPng(await png.arrayBuffer());
+}
+
+export async function pageCount(source: PdfSource): Promise<number> {
+  return (await load(source)).getPageCount();
+}
+
+export async function merge(
+  sources: PdfSource[],
+  onProgress?: ProgressFn,
+): Promise<Uint8Array> {
+  const out = await PDFDocument.create();
+
+  for (let i = 0; i < sources.length; i++) {
+    const src = await load(sources[i]);
+    const pages = await out.copyPages(src, src.getPageIndices());
+    for (const page of pages) out.addPage(page);
+    onProgress?.(i + 1, sources.length);
+  }
+
+  return finish(out);
+}
+
+/** One PDF containing the given 1-based pages, in the order given. */
+export async function extractPages(
+  source: PdfSource,
+  pages: number[],
+): Promise<Uint8Array> {
+  const src = await load(source);
+  const out = await PDFDocument.create();
+  const copied = await out.copyPages(
+    src,
+    pages.map((p) => p - 1),
+  );
+  for (const page of copied) out.addPage(page);
+  return finish(out);
+}
+
+/** One output document per group of 1-based page numbers. */
+export async function splitPages(
+  source: PdfSource,
+  groups: number[][],
+  onProgress?: ProgressFn,
+): Promise<Uint8Array[]> {
+  const src = await load(source);
+  const results: Uint8Array[] = [];
+
+  for (let i = 0; i < groups.length; i++) {
+    const out = await PDFDocument.create();
+    const copied = await out.copyPages(
+      src,
+      groups[i].map((p) => p - 1),
+    );
+    for (const page of copied) out.addPage(page);
+    results.push(await finish(out));
+    onProgress?.(i + 1, groups.length);
+  }
+
+  return results;
+}
+
+/** Reorder, rotate and drop pages in a single pass. */
+export async function organise(
+  source: PdfSource,
+  ops: PageOp[],
+): Promise<Uint8Array> {
+  const src = await load(source);
+  const out = await PDFDocument.create();
+  const copied = await out.copyPages(
+    src,
+    ops.map((op) => op.source - 1),
+  );
+
+  copied.forEach((page, i) => {
+    const extra = ops[i].rotate;
+    if (extra) {
+      // Rotation is cumulative with whatever the page already carried.
+      const current = page.getRotation().angle;
+      page.setRotation(degrees(((current + extra) % 360 + 360) % 360));
+    }
+    out.addPage(page);
+  });
+
+  return finish(out);
+}
+
+export async function imagesToPdf(
+  files: File[],
+  opts: ImagesToPdfOptions,
+  onProgress?: ProgressFn,
+): Promise<Uint8Array> {
+  const out = await PDFDocument.create();
+
+  for (let i = 0; i < files.length; i++) {
+    const image = await embedImage(out, files[i]);
+    const { width: iw, height: ih } = image;
+
+    if (opts.pageSize === "fit") {
+      // A page exactly the size of the picture, plus any margin.
+      const page = out.addPage([iw + opts.margin * 2, ih + opts.margin * 2]);
+      page.drawImage(image, { x: opts.margin, y: opts.margin, width: iw, height: ih });
+    } else {
+      const [pw, ph] = PAGE_SIZES[opts.pageSize];
+      const landscape =
+        opts.orientation === "landscape" || (opts.orientation === "auto" && iw > ih);
+      const [pageW, pageH] = landscape ? [ph, pw] : [pw, ph];
+
+      const page = out.addPage([pageW, pageH]);
+      const boxW = pageW - opts.margin * 2;
+      const boxH = pageH - opts.margin * 2;
+      // Contain, never crop, and never enlarge a small image past 1:1.
+      const scale = Math.min(boxW / iw, boxH / ih, 1);
+      const w = iw * scale;
+      const h = ih * scale;
+
+      page.drawImage(image, {
+        x: (pageW - w) / 2,
+        y: (pageH - h) / 2,
+        width: w,
+        height: h,
+      });
+    }
+
+    onProgress?.(i + 1, files.length);
+  }
+
+  return finish(out);
+}
+
+export async function addPageNumbers(
+  source: PdfSource,
+  opts: PageNumberOptions,
+): Promise<Uint8Array> {
+  const doc = await load(source);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const pages = doc.getPages();
+  const skip = new Set(opts.skipPages);
+
+  let counter = opts.startAt;
+  const numbered = pages.length - skip.size;
+
+  pages.forEach((page, index) => {
+    if (skip.has(index + 1)) return;
+
+    const label = opts.format
+      .replace(/\{n\}/g, String(counter))
+      .replace(/\{total\}/g, String(numbered));
+    counter++;
+
+    drawAtCorner(page, label, font, opts);
+  });
+
+  return finish(doc);
+}
+
+export async function watermark(
+  source: PdfSource,
+  opts: WatermarkOptions,
+): Promise<Uint8Array> {
+  const doc = await load(source);
+  const font = await doc.embedFont(StandardFonts.HelveticaBold);
+  const colour = rgb(opts.colour.r, opts.colour.g, opts.colour.b);
+
+  for (const page of doc.getPages()) {
+    const { width, height } = page.getSize();
+    const textWidth = font.widthOfTextAtSize(opts.text, opts.fontSize);
+
+    if (opts.tile) {
+      const stepX = textWidth + opts.fontSize * 4;
+      const stepY = opts.fontSize * 5;
+      for (let y = -height; y < height * 2; y += stepY) {
+        for (let x = -width; x < width * 2; x += stepX) {
+          page.drawText(opts.text, {
+            x,
+            y,
+            size: opts.fontSize,
+            font,
+            color: colour,
+            opacity: opts.opacity,
+            rotate: degrees(opts.angle),
+          });
+        }
+      }
+    } else {
+      // Centre the rotated baseline on the page.
+      const radians = (opts.angle * Math.PI) / 180;
+      const x = width / 2 - (textWidth / 2) * Math.cos(radians);
+      const y = height / 2 - (textWidth / 2) * Math.sin(radians);
+
+      page.drawText(opts.text, {
+        x,
+        y,
+        size: opts.fontSize,
+        font,
+        color: colour,
+        opacity: opts.opacity,
+        rotate: degrees(opts.angle),
+      });
+    }
+  }
+
+  return finish(doc);
+}
+
+export async function protect(
+  source: PdfSource,
+  opts: ProtectOptions,
+): Promise<Uint8Array> {
+  const doc = await load(source);
+  await doc.encrypt({
+    userPassword: opts.userPassword,
+    ownerPassword: opts.ownerPassword || opts.userPassword,
+    permissions: {
+      printing: opts.allowPrinting ? "highResolution" : undefined,
+      copying: opts.allowCopying,
+      modifying: false,
+    },
+  });
+  return finish(doc);
+}
+
+/** Re-saves without encryption. Needs the password that opens the file. */
+export async function unlock(
+  source: PdfSource,
+  password: string,
+): Promise<Uint8Array> {
+  const doc = await PDFDocument.load(await bytesOf(source), { password });
+  // Copying into a fresh document is what actually drops the /Encrypt
+  // dictionary — re-saving the loaded one can carry it over.
+  const out = await PDFDocument.create();
+  const pages = await out.copyPages(doc, doc.getPageIndices());
+  for (const page of pages) out.addPage(page);
+  return finish(out);
+}
+
+function drawAtCorner(
+  page: PDFPage,
+  label: string,
+  font: PDFFont,
+  opts: PageNumberOptions,
+): void {
+  const { width, height } = page.getSize();
+  const textWidth = font.widthOfTextAtSize(label, opts.fontSize);
+  const m = opts.margin;
+
+  const positions: Record<Corner, [number, number]> = {
+    "top-left": [m, height - m - opts.fontSize],
+    "top-centre": [(width - textWidth) / 2, height - m - opts.fontSize],
+    "top-right": [width - textWidth - m, height - m - opts.fontSize],
+    "bottom-left": [m, m],
+    "bottom-centre": [(width - textWidth) / 2, m],
+    "bottom-right": [width - textWidth - m, m],
+  };
+
+  const [x, y] = positions[opts.position];
+  page.drawText(label, { x, y, size: opts.fontSize, font, color: rgb(0, 0, 0) });
+}

@@ -113,7 +113,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["extract pages", "separate", "divide"],
     accepts: ["pdf"],
     extensions: ["pdf"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/SplitPdf"),
   },
   {
     slug: "organise-pdf",
@@ -123,7 +124,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["reorder", "rotate", "delete pages", "rearrange"],
     accepts: ["pdf"],
     extensions: ["pdf"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/OrganisePdf"),
   },
   {
     slug: "compress-pdf",
@@ -154,7 +156,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["jpg to pdf", "png to pdf", "scan"],
     accepts: ["image"],
     multiple: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/ImagesToPdf"),
   },
   {
     slug: "page-numbers",
@@ -164,7 +167,8 @@ export const TOOLS: ToolDef[] = [
     keywords: ["footer", "header", "numbering"],
     accepts: ["pdf"],
     extensions: ["pdf"],
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/PageNumbers"),
   },
   {
     slug: "watermark-pdf",
@@ -175,7 +179,8 @@ export const TOOLS: ToolDef[] = [
     accepts: ["pdf"],
     extensions: ["pdf"],
     multiple: true,
-    status: "soon",
+    status: "ready",
+    load: () => import("../tools/WatermarkPdf"),
   },
   {
     slug: "sign-pdf",

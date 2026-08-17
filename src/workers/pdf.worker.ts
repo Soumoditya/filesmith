@@ -1,49 +1,61 @@
-import { PDFDocument } from "@cantoo/pdf-lib";
 import * as Comlink from "comlink";
+import * as ops from "../lib/pdfOps";
 
 /**
- * PDF work happens off the main thread so the UI stays responsive on big
- * documents. File objects are passed in directly rather than ArrayBuffers:
- * they're structured-cloneable by reference, so a 200MB PDF is never held
- * in main-thread memory just to hand it over.
+ * A thin Comlink shim over `lib/pdfOps`, so PDF writing happens off the main
+ * thread. All the actual logic lives in pdfOps, where it can be tested.
+ *
+ * File objects cross the boundary directly rather than as ArrayBuffers:
+ * they're structured-cloneable by reference, so a 200MB PDF is never copied
+ * into main-thread memory just to hand it over.
  */
 
-export type ProgressFn = (done: number, total: number) => void;
-
-export interface PdfWorkerApi {
-  pageCount(file: File): Promise<number>;
-  merge(files: File[], onProgress: ProgressFn): Promise<Uint8Array>;
+/** Hands ownership of the bytes back instead of copying them. */
+function send(bytes: Uint8Array): Uint8Array {
+  return Comlink.transfer(bytes, [bytes.buffer as ArrayBuffer]);
 }
 
-async function load(file: File) {
-  const bytes = await file.arrayBuffer();
-  // `ignoreEncryption` lets us read PDFs that carry an owner password but no
-  // user password — very common for documents from banks and government sites.
-  return PDFDocument.load(bytes, { ignoreEncryption: true });
+function sendAll(list: Uint8Array[]): Uint8Array[] {
+  return Comlink.transfer(
+    list,
+    list.map((b) => b.buffer as ArrayBuffer),
+  );
 }
 
-const api: PdfWorkerApi = {
-  async pageCount(file) {
-    const doc = await load(file);
-    return doc.getPageCount();
-  },
+const api = {
+  pageCount: (file: File) => ops.pageCount(file),
 
-  async merge(files, onProgress) {
-    const out = await PDFDocument.create();
+  merge: async (files: File[], onProgress: ops.ProgressFn) =>
+    send(await ops.merge(files, onProgress)),
 
-    for (let i = 0; i < files.length; i++) {
-      const src = await load(files[i]);
-      const pages = await out.copyPages(src, src.getPageIndices());
-      for (const page of pages) out.addPage(page);
-      onProgress(i + 1, files.length);
-    }
+  extractPages: async (file: File, pages: number[]) =>
+    send(await ops.extractPages(file, pages)),
 
-    out.setProducer("Filesmith");
-    out.setCreator("Filesmith");
+  splitPages: async (file: File, groups: number[][], onProgress: ops.ProgressFn) =>
+    sendAll(await ops.splitPages(file, groups, onProgress)),
 
-    const bytes = await out.save();
-    return Comlink.transfer(bytes, [bytes.buffer as ArrayBuffer]);
-  },
+  organise: async (file: File, pageOps: ops.PageOp[]) =>
+    send(await ops.organise(file, pageOps)),
+
+  imagesToPdf: async (
+    files: File[],
+    opts: ops.ImagesToPdfOptions,
+    onProgress: ops.ProgressFn,
+  ) => send(await ops.imagesToPdf(files, opts, onProgress)),
+
+  addPageNumbers: async (file: File, opts: ops.PageNumberOptions) =>
+    send(await ops.addPageNumbers(file, opts)),
+
+  watermark: async (file: File, opts: ops.WatermarkOptions) =>
+    send(await ops.watermark(file, opts)),
+
+  protect: async (file: File, opts: ops.ProtectOptions) =>
+    send(await ops.protect(file, opts)),
+
+  unlock: async (file: File, password: string) =>
+    send(await ops.unlock(file, password)),
 };
+
+export type PdfWorkerApi = typeof api;
 
 Comlink.expose(api);

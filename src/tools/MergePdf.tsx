@@ -8,7 +8,7 @@ import {
   Plus,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DropZone } from "../components/DropZone";
 import { ToolShell } from "../components/ToolShell";
 import { Button, Card, Notice, ProgressBar } from "../components/ui";
@@ -35,7 +35,6 @@ export default function MergePdf() {
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<Blob | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const resultUrl = useRef<string | null>(null);
 
   const addFiles = useCallback((incoming: File[]) => {
     const pdfs = incoming.filter((f) => f.name.toLowerCase().endsWith(".pdf"));
@@ -73,12 +72,6 @@ export default function MergePdf() {
     const staged = claimFiles();
     if (staged) addFiles(staged);
   }, [addFiles]);
-
-  useEffect(() => {
-    return () => {
-      if (resultUrl.current) URL.revokeObjectURL(resultUrl.current);
-    };
-  }, []);
 
   const move = (index: number, delta: number) => {
     setEntries((prev) => {
