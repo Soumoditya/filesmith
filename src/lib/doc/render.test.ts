@@ -20,9 +20,21 @@ beforeAll(() => {
   setFontLoader(async (name) => new Uint8Array(await readFile(join(FONT_DIR, name))));
 });
 
+/**
+ * pdf.js is loaded once for the whole suite. Importing it per call made
+ * these tests intermittently blow past the default timeout — the assertions
+ * were sound, the import cost wasn't.
+ */
+let pdfjsPromise: Promise<typeof import("pdfjs-dist/legacy/build/pdf.mjs")> | null = null;
+
+function getPdfjs() {
+  pdfjsPromise ??= import("pdfjs-dist/legacy/build/pdf.mjs");
+  return pdfjsPromise;
+}
+
 /** Extracts the text of every page, using pdf.js rather than our own code. */
 async function extractText(bytes: Uint8Array): Promise<string[]> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const pdfjs = await getPdfjs();
   const task = pdfjs.getDocument({
     data: new Uint8Array(bytes),
     useSystemFonts: false,
@@ -225,7 +237,7 @@ describe("metadata", () => {
     const { bytes } = await renderDocument(
       spec([para("x")], { title: "Asha Menon — Resume", author: "Asha Menon" }),
     );
-    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const pdfjs = await getPdfjs();
     const task = pdfjs.getDocument({ data: new Uint8Array(bytes), verbosity: 0 });
     const doc = await task.promise;
     const meta = (await doc.getMetadata()) as unknown as { info: Record<string, string> };
