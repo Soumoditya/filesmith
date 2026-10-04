@@ -63,6 +63,8 @@ export interface InvoiceDoc {
   terms: string;
   bankDetails: string;
   upiId: string;
+  /** Print a UPI QR code that pays this bill's total. Missing in old drafts. */
+  showUpiQr?: boolean;
   /** Logo as a data URL. */
   logo: string | null;
   /** Print the total spelled out — expected on Indian invoices. */
@@ -434,6 +436,7 @@ export function sampleInvoice(kind: DocumentKind = "invoice"): InvoiceDoc {
     terms: "Payment due within 15 days.",
     bankDetails: "",
     upiId: "",
+    showUpiQr: true,
     logo: null,
     showAmountInWords: true,
     roundOff: true,

@@ -1,9 +1,11 @@
+import { createCanvas } from "@napi-rs/canvas";
+import jsQR from "jsqr";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { setFontLoader } from "../doc/fonts";
 import { renderDocument } from "../doc/render";
-import { emptyItem, sampleInvoice, type InvoiceDoc } from "./model";
+import { emptyItem, invoiceTotals, sampleInvoice, type InvoiceDoc } from "./model";
 import { buildInvoiceDocument } from "./template";
 
 /**
@@ -37,6 +39,40 @@ async function textOf(doc: InvoiceDoc): Promise<string> {
   await task.destroy();
   return out;
 }
+
+/**
+ * Rasterises page one and reads any QR code on it, the way a phone camera
+ * would. Proves the printed code scans, not just that something was drawn.
+ */
+async function scanPage(doc: InvoiceDoc): Promise<string | null> {
+  const { bytes } = await renderDocument(buildInvoiceDocument(doc));
+  const pdfjs = await getPdfjs();
+  const task = pdfjs.getDocument({ data: new Uint8Array(bytes), verbosity: 0 });
+  const parsed = await task.promise;
+  const page = await parsed.getPage(1);
+  const viewport = page.getViewport({ scale: 2 });
+
+  const canvas = createCanvas(Math.round(viewport.width), Math.round(viewport.height));
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({
+    canvasContext: ctx as unknown as CanvasRenderingContext2D,
+    viewport,
+    canvas: canvas as unknown as HTMLCanvasElement,
+  }).promise;
+
+  const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  await task.destroy();
+  return jsQR(new Uint8ClampedArray(data), canvas.width, canvas.height)?.data ?? null;
+}
+
+const withUpi = (over: Partial<InvoiceDoc> = {}): InvoiceDoc => ({
+  ...sampleInvoice(),
+  upiId: "meridian@okaxis",
+  ...over,
+  from: { ...sampleInvoice().from, name: "Meridian Studio" },
+});
 
 /** Font changes split runs, so compare with whitespace collapsed. */
 const squash = (s: string) => s.replace(/\s+/g, "");
@@ -138,5 +174,53 @@ describe("invoice rendering", () => {
     const text = await textOf(doc);
     expect(text).toContain("Line item number 1 ");
     expect(text).toContain("Line item number 45");
+  });
+
+  describe("scan to pay", () => {
+    it("prints the QR with the bill's total beside it", async () => {
+      const text = squash(await textOf(withUpi()));
+      // 50,000 + 18% GST.
+      expect(text).toContain("Scantopay₹59,000.00");
+      expect(text).toContain("UPI:meridian@okaxis");
+    });
+
+    it("scans to a payment for exactly the total on the bill", async () => {
+      const doc = withUpi({ number: "INV-042" });
+      doc.items = [
+        { ...emptyItem(18), description: "Design", rate: 12345.67 },
+        { ...emptyItem(5), description: "Prints", rate: 800, quantity: 3 },
+      ];
+      const { total } = invoiceTotals(doc);
+
+      const decoded = await scanPage(doc);
+      expect(decoded).not.toBeNull();
+      expect(decoded).toBe(
+        `upi://pay?pa=meridian%40okaxis&pn=Meridian%20Studio&am=${total.toFixed(2)}` +
+          "&cu=INR&tn=Invoice%20INV-042",
+      );
+    });
+
+    it("leaves the QR off a receipt, which is already paid", async () => {
+      const doc = withUpi({ kind: "receipt" });
+      expect(await textOf(doc)).not.toContain("Scan to pay");
+      expect(await scanPage(doc)).toBeNull();
+    });
+
+    it("leaves it off when switched off, but keeps the UPI ID", async () => {
+      const text = await textOf(withUpi({ showUpiQr: false }));
+      expect(text).not.toContain("Scan to pay");
+      expect(text).toContain("meridian@okaxis");
+    });
+
+    it("leaves it off for a mistyped UPI ID rather than print a code that fails", async () => {
+      const doc = withUpi({ upiId: "meridian.okaxis" });
+      expect(await textOf(doc)).not.toContain("Scan to pay");
+      expect(await scanPage(doc)).toBeNull();
+    });
+
+    it("leaves it off for other currencies, since UPI is rupees only", async () => {
+      const doc = withUpi({ currency: "USD", currencySymbol: "$" });
+      expect(await textOf(doc)).not.toContain("Scan to pay");
+    });
   });
 });

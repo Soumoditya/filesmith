@@ -1,3 +1,4 @@
+import QRCode from "qrcode";
 import { DEFAULT_STYLE, pageSetup, type Block, type DocumentSpec, type Inline } from "../doc/model";
 import {
   amountInWords,
@@ -7,6 +8,7 @@ import {
   lineTotals,
   type InvoiceDoc,
 } from "./model";
+import { invoiceUpiUri } from "./upi";
 
 /**
  * Renders an invoice to document blocks.
@@ -248,6 +250,8 @@ export function buildInvoiceDocument(doc: InvoiceDoc): DocumentSpec {
   /* ------------------------------------------------------ payment + notes */
   const footer: Block[] = [];
 
+  const upiUri = invoiceUpiUri(doc, totals.total, label.noun);
+
   if (doc.bankDetails.trim() || doc.upiId.trim()) {
     footer.push({
       type: "paragraph",
@@ -261,10 +265,34 @@ export function buildInvoiceDocument(doc: InvoiceDoc): DocumentSpec {
         after: 3,
       });
     }
+    if (upiUri) {
+      // The amount comes from the same totals as the Total row, so the code
+      // can never ask for a different sum from the one printed above it.
+      const qr = QRCode.create(upiUri, { errorCorrectionLevel: "M" });
+      footer.push({
+        type: "paragraph",
+        runs: [
+          text(`Scan to pay ${cash(totals.total)}`, { bold: true, size: 9.5, colour: accent }),
+          text("\nWith any UPI app. The amount is filled in for you.", {
+            size: 8.5,
+            colour: GREY,
+          }),
+        ],
+        before: 2,
+        after: 2,
+      });
+      footer.push({
+        type: "qr",
+        modules: qr.modules.data,
+        size: qr.modules.size,
+        width: 104,
+        after: 2,
+      });
+    }
     if (doc.upiId.trim()) {
       footer.push({
         type: "paragraph",
-        runs: [text(`UPI: ${doc.upiId}`, { size: 9, colour: GREY })],
+        runs: [text(`UPI: ${doc.upiId.trim()}`, { size: 9, colour: GREY })],
         after: 8,
       });
     }

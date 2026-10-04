@@ -232,6 +232,65 @@ describe("blocks", () => {
   });
 });
 
+/** Each piece of text on page one with its baseline height, top of page first. */
+async function textRows(bytes: Uint8Array): Promise<Array<{ str: string; y: number }>> {
+  const pdfjs = await getPdfjs();
+  const task = pdfjs.getDocument({ data: new Uint8Array(bytes), verbosity: 0 });
+  const page = await (await task.promise).getPage(1);
+  const content = await page.getTextContent();
+  const rows = content.items
+    .filter((item) => "str" in item && item.str.trim())
+    .map((item) => ({
+      str: (item as { str: string }).str,
+      y: (item as { transform: number[] }).transform[5],
+    }));
+  await task.destroy();
+  return rows;
+}
+
+describe("line breaks", () => {
+  const yOf = (rows: Array<{ str: string; y: number }>, needle: string) =>
+    rows.find((r) => r.str.includes(needle))!.y;
+
+  // Addresses, code and "keep my line breaks" all pass newlines in a run.
+  // These were once read as plain spaces, so a two-line address came out on
+  // one line with no error anywhere.
+  it("starts a new line at a newline, even with room to spare", async () => {
+    const { bytes } = await renderDocument(spec([para("12 MG Road\nBengaluru")]));
+    const rows = await textRows(bytes);
+    expect(yOf(rows, "12 MG Road")).toBeGreaterThan(yOf(rows, "Bengaluru"));
+  });
+
+  it("leaves a blank line for two newlines in a row", async () => {
+    const one = await textRows((await renderDocument(spec([para("A\nB")]))).bytes);
+    const two = await textRows((await renderDocument(spec([para("A\n\nB")]))).bytes);
+    const gap = (rows: typeof one) => yOf(rows, "A") - yOf(rows, "B");
+    expect(gap(two)).toBeCloseTo(gap(one) * 2, 1);
+  });
+
+  it("breaks inside table cells too, across separate runs", async () => {
+    const { bytes } = await renderDocument(
+      spec([
+        {
+          type: "table",
+          columns: [{ width: 1 }, { width: 1 }],
+          rows: [[[{ text: "FROM\n" }, { text: "Meridian Studio" }], [{ text: "BILL TO" }]]],
+        },
+      ]),
+    );
+    const rows = await textRows(bytes);
+    expect(yOf(rows, "FROM")).toBeGreaterThan(yOf(rows, "Meridian Studio"));
+    expect(yOf(rows, "FROM")).toBe(yOf(rows, "BILL TO"));
+  });
+
+  it("does not add a blank line for a trailing newline", async () => {
+    const plain = await renderDocument(spec([para("Line"), para("Next")]));
+    const trailing = await renderDocument(spec([para("Line\n"), para("Next")]));
+    const gap = (rows: Array<{ str: string; y: number }>) => yOf(rows, "Line") - yOf(rows, "Next");
+    expect(gap(await textRows(trailing.bytes))).toBeCloseTo(gap(await textRows(plain.bytes)), 1);
+  });
+});
+
 describe("metadata", () => {
   it("records the title and author", async () => {
     const { bytes } = await renderDocument(

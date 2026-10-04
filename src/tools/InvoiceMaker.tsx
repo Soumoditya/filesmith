@@ -3,11 +3,13 @@ import {
   Download,
   FolderOpen,
   Plus,
+  QrCode,
   RotateCcw,
   Save,
   Trash2,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import QRCode from "qrcode";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DocPreview, useDocumentPreview } from "../components/DocPreview";
 import { ToolShell } from "../components/ToolShell";
 import {
@@ -47,6 +49,7 @@ import {
   type TaxMode,
 } from "../lib/invoice/model";
 import { buildInvoiceDocument } from "../lib/invoice/template";
+import { invoiceUpiUri, validateUpiId } from "../lib/invoice/upi";
 import { getTool } from "../lib/registry";
 
 const DRAFT_KEY = "invoice";
@@ -82,6 +85,8 @@ export default function InvoiceMaker() {
   const cash = (v: number) => formatMoney(v, doc.currencySymbol, doc.currency);
   const isIndian = doc.currency === "INR";
   const gstinError = validateGstin(doc.from.gstin) ?? validateGstin(doc.to.gstin);
+  const upiError = validateUpiId(doc.upiId);
+  const upiUri = invoiceUpiUri(doc, totals.total, DOCUMENT_LABELS[doc.kind].noun);
 
   const exportPdf = async () => {
     setExporting(true);
@@ -494,16 +499,47 @@ export default function InvoiceMaker() {
               </Field>
 
               {isIndian && (
-                <Field label="UPI ID" hint="So they can pay from a phone.">
-                  {(id) => (
-                    <TextInput
-                      id={id}
-                      value={doc.upiId}
-                      onChange={(e) => patch({ upiId: e.target.value })}
-                      placeholder="yourname@bank"
+                <div className="space-y-3">
+                  <Field label="UPI ID" hint="So they can pay from a phone.">
+                    {(id) => (
+                      <TextInput
+                        id={id}
+                        value={doc.upiId}
+                        onChange={(e) => patch({ upiId: e.target.value })}
+                        placeholder="yourname@okaxis"
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                    )}
+                  </Field>
+
+                  {upiError && (
+                    <Notice tone="warning" icon={<AlertTriangle className="size-4" />}>
+                      {upiError} The QR code is left off until it’s fixed, so nobody
+                      scans a code that can’t pay you.
+                    </Notice>
+                  )}
+
+                  <Checkbox
+                    label="Print a scan-to-pay QR code with the total filled in"
+                    checked={doc.showUpiQr !== false}
+                    onChange={(e) => patch({ showUpiQr: e.target.checked })}
+                  />
+
+                  {doc.showUpiQr !== false && doc.kind === "receipt" && (
+                    <p className="text-xs text-muted">
+                      Receipts are already paid, so no QR code is printed on them.
+                    </p>
+                  )}
+
+                  {upiUri && (
+                    <UpiQrPreview
+                      uri={upiUri}
+                      amount={cash(totals.total)}
+                      filename={`${DOCUMENT_LABELS[doc.kind].noun} ${doc.number || ""}`.trim()}
                     />
                   )}
-                </Field>
+                </div>
               )}
 
               <Field label="Terms">
@@ -630,5 +666,51 @@ export default function InvoiceMaker() {
         </div>
       </div>
     </ToolShell>
+  );
+}
+
+/**
+ * The same code that goes on the PDF, shown here so it can be tested with a
+ * phone before the bill is sent, and saved on its own for WhatsApp.
+ */
+function UpiQrPreview({ uri, amount, filename }: { uri: string; amount: string; filename: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    void QRCode.toCanvas(canvas, uri, { errorCorrectionLevel: "M", margin: 4, width: 480 });
+  }, [uri]);
+
+  const download = () => {
+    canvasRef.current?.toBlob((blob) => {
+      if (blob) saveBlob(blob, `${filename} UPI QR.png`);
+    }, "image/png");
+  };
+
+  return (
+    <div className="flex flex-col gap-4 rounded-lg border border-line p-3 sm:flex-row sm:items-center">
+      <canvas
+        ref={canvasRef}
+        className="size-36 shrink-0 self-center rounded bg-white sm:self-auto"
+        aria-label={`UPI QR code to pay ${amount}`}
+        role="img"
+      />
+      <div className="min-w-0 space-y-2">
+        <p className="text-sm font-semibold text-ink">Scan to pay {amount}</p>
+        <p className="text-xs text-muted">
+          Opens any UPI app (GPay, PhonePe, Paytm, BHIM) with your UPI ID and this
+          bill’s total already filled in. It updates as you change the items.
+        </p>
+        <p className="text-xs text-muted">
+          A QR code can’t confirm a payment. Check your bank app before you mark the
+          bill as paid.
+        </p>
+        <Button size="sm" onClick={download}>
+          <QrCode className="size-4" aria-hidden />
+          Download QR
+        </Button>
+      </div>
+    </div>
   );
 }
