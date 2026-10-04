@@ -114,6 +114,22 @@ export interface ImageBlock extends Spacing {
   align?: Align;
 }
 
+/**
+ * A QR code drawn as vector squares rather than an embedded picture, so it
+ * stays sharp at any zoom and on any printer, and needs no image encoding.
+ */
+export interface QrBlock extends Spacing {
+  type: "qr";
+  /** Row-major dark/light modules, `size` × `size`, as `qrcode` produces. */
+  modules: ArrayLike<boolean | number>;
+  size: number;
+  /** Overall width in points, quiet zone included. */
+  width: number;
+  /** Light modules around the code. Scanners need four. */
+  quietZone?: number;
+  align?: Align;
+}
+
 export type Block =
   | HeadingBlock
   | ParagraphBlock
@@ -123,7 +139,8 @@ export type Block =
   | TableBlock
   | KeepTogetherBlock
   | PageBreakBlock
-  | ImageBlock;
+  | ImageBlock
+  | QrBlock;
 
 export interface Margins {
   top: number;

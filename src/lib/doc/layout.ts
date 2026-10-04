@@ -69,7 +69,20 @@ export interface DrawImage {
   x: number;
 }
 
-export type Drawable = DrawLine | DrawRule | DrawSpace | DrawImage;
+export interface DrawMatrix {
+  kind: "matrix";
+  modules: ArrayLike<boolean | number>;
+  size: number;
+  /** Side of one module, in points. */
+  cell: number;
+  /** Total width and height (it is square), quiet zone included. */
+  width: number;
+  height: number;
+  quietZone: number;
+  x: number;
+}
+
+export type Drawable = DrawLine | DrawRule | DrawSpace | DrawImage | DrawMatrix;
 
 interface Group {
   drawables: Drawable[];
@@ -101,6 +114,8 @@ export interface LaidOutDocument {
 interface Token {
   text: string;
   isSpace: boolean;
+  /** A newline in the source: ends the line here, whatever room is left. */
+  isBreak?: boolean;
   bold: boolean;
   italic: boolean;
   size: number;
@@ -124,9 +139,24 @@ function tokenise(
     const colour = run.colour ?? (run.href ? style.accent : style.colour);
     const stack = fonts.get(bold, italic);
 
-    // Keep the separators so spacing survives a run boundary.
-    for (const piece of run.text.split(/(\s+)/)) {
+    // Keep the separators so spacing survives a run boundary. Newlines are
+    // split out on their own: every caller (addresses, code, "keep my line
+    // breaks") means them as hard breaks, not as one more space.
+    for (const piece of run.text.split(/(\r?\n|[^\S\r\n]+)/)) {
       if (piece === "") continue;
+      if (/^\r?\n$/.test(piece)) {
+        tokens.push({
+          text: "",
+          isSpace: true,
+          isBreak: true,
+          bold,
+          italic,
+          size,
+          colour,
+          width: 0,
+        });
+        continue;
+      }
       tokens.push({
         text: piece,
         isSpace: /^\s+$/.test(piece),
@@ -249,6 +279,21 @@ export function wrapText(
   };
 
   for (let token of tokens) {
+    if (token.isBreak) {
+      // A break after text ends that line (never justified, like a last
+      // line); a break on an empty line is a blank line of its own.
+      if (current.length > 0) flush(true);
+      else {
+        lines.push({
+          kind: "line",
+          runs: [],
+          height: token.size * lineHeight,
+          ascent: token.size * 0.8,
+        });
+      }
+      continue;
+    }
+
     if (!token.isSpace && token.width > width) {
       flush(false);
       const pieces = breakLongToken(token, fonts, width);
@@ -519,6 +564,32 @@ function blockToGroups(
               format: block.format,
               width: w,
               height: h,
+              x: alignOffset(block.align ?? "left", width, w),
+            },
+            ...space(block.after),
+          ],
+          keepTogether: true,
+          minKeep: 1,
+        },
+      ];
+    }
+
+    case "qr": {
+      const quietZone = block.quietZone ?? 4;
+      const w = Math.min(block.width, width);
+      const cell = w / (block.size + quietZone * 2);
+      return [
+        {
+          drawables: [
+            ...space(block.before),
+            {
+              kind: "matrix",
+              modules: block.modules,
+              size: block.size,
+              cell,
+              width: w,
+              height: w,
+              quietZone,
               x: alignOffset(block.align ?? "left", width, w),
             },
             ...space(block.after),

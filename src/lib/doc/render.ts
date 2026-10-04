@@ -129,6 +129,35 @@ export async function renderDocument(spec: DocumentSpec): Promise<RenderResult> 
           break;
         }
 
+        case "matrix": {
+          // Merge each row's dark runs into one rectangle: a QR has thousands
+          // of modules and one path per module bloats the file for nothing.
+          const { modules, size, cell, quietZone } = drawable;
+          const left = margins.left + drawable.x;
+          const black = rgb(0, 0, 0);
+          for (let row = 0; row < size; row++) {
+            let col = 0;
+            while (col < size) {
+              if (!modules[row * size + col]) {
+                col++;
+                continue;
+              }
+              const start = col;
+              while (col < size && modules[row * size + col]) col++;
+              pdfPage.drawRectangle({
+                x: left + (quietZone + start) * cell,
+                y: top - (quietZone + row + 1) * cell,
+                width: (col - start) * cell,
+                // A hair of overlap stops anti-aliasing seams between rows,
+                // which can confuse a phone camera on screen.
+                height: cell + 0.05,
+                color: black,
+              });
+            }
+          }
+          break;
+        }
+
         case "space":
           break;
       }
